@@ -1,0 +1,5 @@
+<library path="nav_drone_thetastar_planner">
+  <class type="nav_drone_thetastar_planner::ThetaStar" base_class_type="nav_drone_core::Planner">
+    <description>Theta Star 3D global planner.</description>
+  </class>
+</library>

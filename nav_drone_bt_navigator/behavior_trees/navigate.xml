@@ -1,0 +1,15 @@
+<root>
+     <BehaviorTree>
+        <ReactiveSequence>
+            <BatteryOK/>
+            <Sequence>
+                <ReadGoal pose="{target_pose}" />
+                <PipelineSequence>
+                    <Wait   seconds="2" />
+                    <ComputePathToPose pose="{target_pose}" planner="ThetaStar" path="{planned_path}" />
+                </PipelineSequence>    
+                <FollowPath path="{planned_path}" controller="VhfPlusController" />
+            </Sequence>
+        </ReactiveSequence>    
+     </BehaviorTree>
+ </root>

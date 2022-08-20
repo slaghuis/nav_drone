@@ -1,0 +1,9 @@
+<root>
+     <BehaviorTree>
+        <Sequence>
+            <ReadGoal pose="{target_pose}" />
+            <ComputePathToPose pose="{target_pose}" path="{planned_path}" />
+            <FollowWaypoints path="{planned_path}" />
+        </Sequence>
+     </BehaviorTree>
+ </root>
