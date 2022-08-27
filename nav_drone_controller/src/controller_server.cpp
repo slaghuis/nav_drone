@@ -182,7 +182,33 @@ private:
 // ODOM SUBSCRIPTION ////////////////////////////////////////////////////////////////////////////////////////////////
   void odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg) 
   {
-    last_velocity_ = msg->twist.twist;
+    // The twist in the odometry message is published in a frame with orientation matching the flight controller,
+    // We need to tranform the speed to the base_link frame 
+    //last_velocity_ = msg->twist.twist;
+    float transform_timeout = 0.1;
+    try {
+      last_velocity_ = tf_buffer_->transform(msg->twist.twist, robot_base_frame_, tf2::durationFromSec(transform_timeout));
+    } catch (tf2::LookupException & ex) {
+      RCLCPP_ERROR(
+        this->get_logger(),
+        "No Transform available Error looking up target frame: %s\n", ex.what());
+    } catch (tf2::ConnectivityException & ex) {
+      RCLCPP_ERROR(
+        this->get_logger(),
+        "Connectivity Error looking up target frame: %s\n", ex.what());
+    } catch (tf2::ExtrapolationException & ex) {
+      RCLCPP_ERROR(
+        this->get_logger(),
+        "Extrapolation Error looking up target frame: %s\n", ex.what());
+    } catch (tf2::TimeoutException & ex) {
+      RCLCPP_ERROR(
+        this->get_logger(),
+        "Transform timeout with tolerance: %.4f", transform_timeout);
+    } catch (tf2::TransformException & ex) {
+      RCLCPP_ERROR(
+        this->get_logger(), "Failed to transform from %s to %s",
+        msg->child_frame_id.c_str(), robot_base_frame_.c_str());
+    }  
   }
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_subscription_;
 
