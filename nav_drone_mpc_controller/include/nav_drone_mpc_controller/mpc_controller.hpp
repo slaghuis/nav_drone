@@ -13,6 +13,7 @@
 //#include "nav_drone_util/odometry_utils.hpp"
 //#include "nav_drone_util/geometry_utils.hpp"
 
+#include <dlib/control.h>
 
 namespace nav_drone_mpc_controller
 {
@@ -56,6 +57,18 @@ class MPCController : public nav_drone_core::Controller
     double desired_linear_vel_;
   private:  
     double last_e_angle_, last_z_angle_;
+    
+    //variables for the DLib MPC Controller
+    static const int STATES = 6;
+    static const int CONTROLS = 3;
+    static const int HORIZON = 30;
+
+    dlib::matrix<double,STATES,STATES> A;
+    dlib::matrix<double,STATES,CONTROLS> B;
+    dlib::matrix<double,STATES,1> C;
+    dlib::matrix<double,STATES,1> Q;
+    dlib::matrix<double,CONTROLS,1> R, lower, upper;
+    std::shared_ptr<dlib::mpc<STATES,CONTROLS,HORIZON>> controller;
     
     double getLookAheadDistance(const geometry_msgs::msg::Twist & speed);
     std::pair<int, int> get_ez_grid_pos(const octomap:: point3d & goal);

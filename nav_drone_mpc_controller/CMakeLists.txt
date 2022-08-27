@@ -24,8 +24,10 @@ find_package(pluginlib REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(dlib REQUIRED)
 
 add_library(mpc_controller src/mpc_controller.cpp)
+target_link_libraries(mpc_controller dlib::dlib)
 target_include_directories(mpc_controller PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)

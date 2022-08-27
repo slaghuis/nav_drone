@@ -93,6 +93,78 @@ void MPCController::configure(const rclcpp::Node::SharedPtr node,
   
   last_e_angle_ = 0.0;
   last_z_angle_ = 0.0;
+  // Setup the dlib MPC Controller
+  
+  // The first thing we do is setup our vehicle dynamics model (A*x + B*u + C).
+  // Our state space (the x) will have 4 dimensions, the 2D vehicle position
+  // and also the 2D velocity.  The control space (u) will be just 2 variables
+  // which encode the amount of force we apply to the vehicle along each axis.
+  // Therefore, the A matrix defines a simple constant velocity model.
+  //matrix<double,STATES,STATES> A;
+  A = 1, 0, 0, 1, 0, 0,  // next_pos = pos + velocity
+      0, 1, 0, 0, 1, 0,  // next_pos = pos + velocity
+      0, 0, 1, 0, 0, 1,  // next_pos = pos + velocity
+      0, 0, 0, 1, 0, 0,  // next_velocity = velocity
+      0, 0, 0, 0, 1, 0,  // next_velocity = velocity
+      0, 0, 0, 0, 0, 1;  // next_velocity = velocity
+
+  // Here we say that the control variables effect only the velocity. That is,
+  // the control applies an acceleration to the vehicle.
+  //matrix<double,STATES,CONTROLS> B;
+  B = 0, 0, 0,
+      0, 0, 0,
+      0, 0, 0,
+      1, 0, 0,
+      0, 1, 0,
+      0, 0, 1;
+
+  // Let's also say there is a small constant acceleration in one direction.
+  // This is the force of gravity in our model. 
+  //matrix<double,STATES,1> C;
+  C = 0,
+      0,
+      0,
+      0.1,
+	    0,
+	    0;
+
+  //const int HORIZON = 30;
+  // Now we need to setup some MPC specific parameters.  To understand them,
+  // let's first talk about how MPC works.  When the MPC tool finds the "best"
+  // control to apply it does it by simulating the process for HORIZON time
+  // steps and selecting the control that leads to the best performance over
+  // the next HORIZON steps.
+  //  
+  // To be precise, each time you ask it for a control, it solves the
+  // following quadratic program:
+  //   
+  //     min     sum_i trans(x_i-target_i)*Q*(x_i-target_i) + trans(u_i)*R*u_i 
+  //    x_i,u_i
+  //
+  //     such that: x_0     == current_state 
+  //                x_{i+1} == A*x_i + B*u_i + C
+  //                lower <= u_i <= upper
+  //                0 <= i < HORIZON
+  //
+  // and reports u_0 as the control you should take given that you are currently
+  // in current_state.  Q and R are user supplied matrices that define how we
+  // penalize variations away from the target state as well as how much we want
+  // to avoid generating large control signals.  We also allow you to specify
+  // upper and lower bound constraints on the controls.  The next few lines
+  // define these parameters for our simple example.
+
+  //matrix<double,STATES,1> Q;
+  // Setup Q so that the MPC only cares about matching the target position and
+  // ignores the velocity.  
+  Q = 1, 1, 1, 0, 0, 0;
+
+  //matrix<double,CONTROLS,1> R, lower, upper;
+  R = 1, 1, 1;
+  lower = -0.5, -0.5, -0.5;
+  upper =  0.5,  0.5,  0.5;
+
+  //Fnally, create the MPC controller
+  controller = std::make_shared<dlib::mpc<STATES,CONTROLS,HORIZON>>(A,B,C,Q,R,lower,upper);
 }
   
     
@@ -110,15 +182,34 @@ geometry_msgs::msg::TwistStamped MPCController::computeVelocityCommands(
   
   // Transform the goal_pose to the base_link frame.  Now flight is realtive to the 
   // current position.
-  geometry_msgs::msg::PoseStamped carrot_pose;
-  nav_drone_util::transformPoseInTargetFrame(goal_pose, carrot_pose, *tf_, "base_link" );
+  //geometry_msgs::msg::PoseStamped carrot_pose;
+  //nav_drone_util::transformPoseInTargetFrame(goal_pose, carrot_pose, *tf_, "base_link" );
+
+  //  Calculate velocity commands using the MPC controller
+  dlib::matrix<double,STATES,1> target;
+  target = goal_pose.pose.position.x, 
+           goal_pose.pose.position.y, 
+           goal_pose.pose.position.z,  
+           0, 0, 0; // Position, at zero velocity
+  controller->set_target(target);
   
+  // Find the best control action given our current state.
+  dlib::matrix<double,STATES,1> current_state;
+  current_state = pose.pose.position.x,
+                  pose.pose.position.y,
+                  pose.pose.position.z,
+                  speed.linear.x,
+                  speed.linear.y,
+                  speed.linear.z;
+  dlib::matrix<double,CONTROLS,1> action = (*controller)(current_state);
+
   geometry_msgs::msg::TwistStamped setpoint = geometry_msgs::msg::TwistStamped();
-  setpoint.header.frame_id = carrot_pose.header.frame_id;   // "base_link";
+  setpoint.header.frame_id = "map";         //carrot_pose.header.frame_id;   // "base_link";
   setpoint.header.stamp = clock_->now();
-  //  CALCULATE THE VELOCITY COMMANDS
   
-  
+  setpoint.twist.linear.x = action(0);
+  setpoint.twist.linear.y = action(1);
+  setpoint.twist.linear.z = action(2);
   
   return setpoint;
   
