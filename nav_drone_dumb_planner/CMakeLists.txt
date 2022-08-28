@@ -24,19 +24,19 @@ find_package(tf2 REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 
-add_library(dumb_planner src/dumb_planner.cpp)
-target_include_directories(dumb_planner PUBLIC
+add_library(nav_drone_dumb_planner src/dumb_planner.cpp)
+target_include_directories(nav_drone_dumb_planner PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 ament_target_dependencies(
-  dumb_planner
+  nav_drone_dumb_planner
   "pluginlib"
   "nav_drone_core"
 )
 
 pluginlib_export_plugin_description_file(nav_drone_core nav_drone_dumb_planner.xml)
 
-install(TARGETS dumb_planner
+install(TARGETS nav_drone_dumb_planner
         EXPORT export_${PROJECT_NAME}
         ARCHIVE DESTINATION lib
         LIBRARY DESTINATION lib
@@ -54,7 +54,7 @@ if(BUILD_TESTING)
 endif()
 
 ament_export_libraries(
-  dumb_planner
+  nav_drone_dumb_planner
 )
 ament_export_targets(
   export_${PROJECT_NAME}
