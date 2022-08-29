@@ -182,7 +182,7 @@ private:
       RCLCPP_INFO(this->get_logger(), "Goal canceled before the first map has been received!");
       return;
     }
-    //pluginlib::ClassLoader<nav_drone_core::Planner> planner_loader("nav_drone", "nav_drone_core::Planner");
+    pluginlib::ClassLoader<nav_drone_core::Planner> loader_("nav_drone", "nav_drone_core::Planner");
     
     try
     {
@@ -227,6 +227,8 @@ private:
     catch(pluginlib::PluginlibException& ex)
     {
       RCLCPP_ERROR(this->get_logger(), "The plugin failed to load for some reason. Error: %s", ex.what());
+      goal_handle->abort(result);
+      return;
     }
         
     // Check if goal is done

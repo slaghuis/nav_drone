@@ -1,5 +1,7 @@
-<library path="nav_drone_dumb_planner">
-  <class type="nav_drone_dumb_planner::DumbPlanner" base_class_type="nav_drone_core::Planner">
-    <description>Planner that returns start and destination.</description>
-  </class>
-</library>
+<class_libraries>
+  <library path="nav_drone_dumb_planner">
+    <class type="nav_drone_dumb_planner::DumbPlanner" base_class_type="nav_drone_core::Planner">
+      <description>Planner that returns start and destination.</description>
+    </class>
+  </library>
+</class_libraries>
