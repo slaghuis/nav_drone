@@ -14,9 +14,19 @@
 #pragma once
 
 #include "rclcpp/rclcpp.hpp"
+#include "rclcpp/exceptions/exceptions.hpp"
 
 namespace nav_drone_util {
 
+/// Declares static ROS2 parameter and sets it to a given value if it was not already declared
+/* Declares static ROS2 parameter and sets it to a given value
+ * if it was not already declared.
+ *
+ * \param[in] node A node in which given parameter to be declared
+ * \param[in] param_name The name of parameter
+ * \param[in] default_value Parameter value to initialize with
+ * \param[in] parameter_descriptor Parameter descriptor (optional)
+ */
 template<typename NodeT>
 void declare_parameter_if_not_declared(
   NodeT node,
@@ -29,5 +39,5 @@ void declare_parameter_if_not_declared(
     node->declare_parameter(param_name, default_value, parameter_descriptor);
   }
 }
-	
+  
 } // namespace nav_drone_util

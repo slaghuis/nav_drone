@@ -19,23 +19,35 @@ find_package(tf2 REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 
-add_library(nav_drone_dumb_planner src/dumb_planner.cpp)
-target_include_directories(nav_drone_dumb_planner PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
-ament_target_dependencies(
-  nav_drone_dumb_planner
-  "pluginlib"
-  "nav_drone_core"
+include_directories(
+  include
 )
+
+set(library_name ${PROJECT_NAME})
+set(dependencies ament_cmake
+  pluginlib
+  nav_drone_core
+)
+
+add_library(${library_name} SHARED
+  src/dumb_planner.cpp)
+  
+ament_target_dependencies(${library_name} ${dependencies})
 
 pluginlib_export_plugin_description_file(nav_drone_core nav_drone_dumb_planner.xml)
 
-install(TARGETS nav_drone_dumb_planner
-        EXPORT export_${PROJECT_NAME}
+install(TARGETS ${library_name}
         ARCHIVE DESTINATION lib
         LIBRARY DESTINATION lib
-        RUNTIME DESTINATION bin)
+        RUNTIME DESTINATION lib/${PROJECT_NAME})
+        
+install(DIRECTORY include/
+  DESTINATION include/
+)
+
+install(FILES nav_drone_dumb_planner.xml
+  DESTINATION share/${PROJECT_NAME}
+)        
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -48,11 +60,8 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-ament_export_libraries(
-  nav_drone_dumb_planner
-)
-ament_export_targets(
-  export_${PROJECT_NAME}
-)
+ament_export_include_directories(include)
+ament_export_libraries(${library_name})
+ament_export_dependencies(${dependencies})
 
 ament_package()

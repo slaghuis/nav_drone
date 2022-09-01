@@ -21,6 +21,10 @@
 #include <memory>
 #include <chrono>
 #include <thread>
+#include <unordered_map>
+#include <iterator>
+#include <vector>
+
 
 #include "builtin_interfaces/msg/duration.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
@@ -48,6 +52,9 @@
 #include <octomap_msgs/conversions.h>
 #include <octomap_msgs/msg/octomap.hpp>
 
+using namespace std::chrono_literals;
+using namespace std::placeholders;
+
 namespace nav_drone
 {
 class PlannerServer : public rclcpp::Node
@@ -55,13 +62,16 @@ class PlannerServer : public rclcpp::Node
 public:
   using ComputePathToPose = nav_drone_msgs::action::ComputePathToPose;
   using GoalHandleComputePathToPose = rclcpp_action::ServerGoalHandle<ComputePathToPose>;
+  
+  using PlannerMap = std::unordered_map<std::string, nav_drone_core::Planner::Ptr>;
 
   NAV_DRONE_PUBLIC
   explicit PlannerServer(const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
   : Node("planner_server", options),
-    loader_("nav_drone_core", "nav_drone_core::Planner")
+    loader_("nav_drone_core", "nav_drone_core::Planner"),
+    default_ids_{"DumbPlanner"},
+    default_types_{"nav_drone_dumb_planner/DumbPlanner"}
   {
-    using namespace std::placeholders;
     
     // Create a transform listener
     tf_buffer_ =
@@ -76,21 +86,19 @@ public:
       this, "robot_base_frame", rclcpp::ParameterValue("base_link"));   
     nav_drone_util::declare_parameter_if_not_declared(
       this, "transform_tolerance", rclcpp::ParameterValue(0.1));
-      
+    declare_parameter("planner_plugins", default_ids_);
+    declare_parameter("planner_types", default_types_);
+    declare_parameter("expected_planner_frequency", 1.0);
+
     this->get_parameter("map_frame", map_frame_);
     this->get_parameter("robot_base_frame", robot_base_frame_);
     this->get_parameter("transform_tolerance", transform_tolerance_);
-   
-    // ROS2 Subscriptions
-    map_subscription_ = this->create_subscription<octomap_msgs::msg::Octomap>(
-      "nav_drone/map", 10, std::bind(&PlannerServer::map_callback, this, _1));
-
-    this->action_server_ = rclcpp_action::create_server<ComputePathToPose>(
-      this,
-      "nav_drone/compute_path_to_pose",
-      std::bind(&PlannerServer::handle_goal, this, _1, _2),
-      std::bind(&PlannerServer::handle_cancel, this, _1),
-      std::bind(&PlannerServer::handle_accepted, this, _1));
+    this->get_parameter("planner_plugins", planner_ids_);
+    this->get_parameter("planner_types", planner_types_);
+    
+    one_off_timer_ = this->create_wall_timer(
+      200ms, std::bind(&PlannerServer::init, this));
+       
   }
 
 protected:
@@ -100,8 +108,18 @@ protected:
   double transform_tolerance_;
     
   // For the plugins
+  //std::shared_ptr<nav_drone_core::Planner> planner_;
+  
+  // Planner
+  PlannerMap planners_;
   pluginlib::ClassLoader<nav_drone_core::Planner> loader_;
-  std::shared_ptr<nav_drone_core::Planner> planner_;
+  std::vector<std::string> default_ids_;
+  std::vector<std::string> default_types_;
+  std::vector<std::string> planner_ids_;
+  std::vector<std::string> planner_types_;
+  double max_planner_duration_;
+  std::string planner_ids_concat_;
+
   
 private:
   rclcpp_action::Server<ComputePathToPose>::SharedPtr action_server_;
@@ -110,6 +128,66 @@ private:
   std::shared_ptr<octomap::OcTree> octomap_;
   
   rclcpp::Clock steady_clock_{RCL_STEADY_TIME};
+  rclcpp::TimerBase::SharedPtr one_off_timer_;
+  
+  void init() {
+    using namespace std::placeholders;
+  
+    // Only run this once.  Stop the timer that triggered this.
+    this->one_off_timer_->cancel();
+    
+    
+    // Setup the planners
+    auto node = shared_from_this();
+
+    for (size_t i = 0; i != planner_ids_.size(); i++) {
+      try {
+        nav_drone_core::Planner::Ptr planner =
+          loader_.createUniqueInstance(planner_types_[i]);
+        RCLCPP_INFO(
+          get_logger(), "Created global planner plugin %s of type %s",
+          planner_ids_[i].c_str(), planner_types_[i].c_str());
+          
+        planner->configure(node, planner_ids_[i], tf_buffer_, octomap_);
+        planners_.insert({planner_ids_[i], planner});
+      } catch (const pluginlib::PluginlibException & ex) {
+        RCLCPP_FATAL(
+          get_logger(), "Failed to create global planner. Exception: %s",
+          ex.what());
+      }
+    }
+
+    for (size_t i = 0; i != planner_ids_.size(); i++) {
+      planner_ids_concat_ += planner_ids_[i] + std::string(" ");
+    }
+
+    RCLCPP_INFO(
+      get_logger(),
+      "Planner Server has %s planners available.", planner_ids_concat_.c_str());
+
+    double expected_planner_frequency;
+    get_parameter("expected_planner_frequency", expected_planner_frequency);
+    if (expected_planner_frequency > 0) {
+      max_planner_duration_ = 1 / expected_planner_frequency;
+    } else {
+      RCLCPP_WARN(
+        get_logger(),
+        "The expected planner frequency parameter is %.4f Hz. The value should to be greater"
+        " than 0.0 to turn on duration overrrun warning messages", expected_planner_frequency);
+      max_planner_duration_ = 0.0;
+    }    
+    
+    // ROS2 Subscriptions
+    map_subscription_ = this->create_subscription<octomap_msgs::msg::Octomap>(
+      "nav_drone/map", 10, std::bind(&PlannerServer::map_callback, this, _1));
+
+    this->action_server_ = rclcpp_action::create_server<ComputePathToPose>(
+      this,
+      "nav_drone/compute_path_to_pose",
+      std::bind(&PlannerServer::handle_goal, this, _1, _2),
+      std::bind(&PlannerServer::handle_cancel, this, _1),
+      std::bind(&PlannerServer::handle_accepted, this, _1));  
+  }
   
   // MAP SUBSCRIPTION ////////////////////////////////////////////////////////////////////////////////////////////////
   void map_callback(const octomap_msgs::msg::Octomap::SharedPtr msg) 
@@ -182,6 +260,23 @@ private:
       RCLCPP_INFO(this->get_logger(), "Goal canceled before the first map has been received!");
       return;
     }
+    
+    // Use start pose if provided otherwise use current robot pose
+    geometry_msgs::msg::PoseStamped start;
+    if (!getStartPose(goal, start)) {
+      goal_handle->abort(result);
+      return;
+    }
+    
+    result->path = getPlan(start, goal->goal, goal->planner_id);
+    
+    if( !validate_path( goal->goal, result->path, goal->planner_id)) {
+        // No valid goal was calculated
+        goal_handle->abort(result);
+        return;
+    }
+    
+    /*  Cutout begins
     pluginlib::ClassLoader<nav_drone_core::Planner> loader_("nav_drone_core", "nav_drone_core::Planner");
     
     try
@@ -231,6 +326,7 @@ private:
       return;
     }
         
+    Cutout Ends */    
     // Check if goal is done
     if (rclcpp::ok()) {
       auto cycle_duration = steady_clock_.now() - start_time;
@@ -239,6 +335,54 @@ private:
       RCLCPP_DEBUG(this->get_logger(), "Successfully calculated a path to the target pose in %d ns", cycle_duration);
     }
   } 
+  
+  bool getStartPose(
+    std::shared_ptr<const ComputePathToPose::Goal> goal,
+    geometry_msgs::msg::PoseStamped & start) 
+  {
+    if (goal->use_start) {
+      start = goal->start;
+    } else if( !nav_drone_util::getCurrentPose( start,
+                *tf_buffer_, 
+                map_frame_, 
+                robot_base_frame_, 
+                transform_tolerance_) ) {  
+      RCLCPP_ERROR(this->get_logger(), "Failed to read current drone position.  Aborting the action.");
+      return false;
+    }
+    
+    return true;
+  }
+  
+  nav_msgs::msg::Path getPlan(
+    const geometry_msgs::msg::PoseStamped & start,
+    const geometry_msgs::msg::PoseStamped & goal,
+    const std::string & planner_id)
+  {
+    RCLCPP_DEBUG(
+      this->get_logger(), "Attempting to a find path from (%.2f, %.2f, %.2f) to "
+      "(%.2f, %.2f, %.2f).", start.pose.position.x, start.pose.position.y, start.pose.position.z,
+      goal.pose.position.x, goal.pose.position.y, goal.pose.position.z);
+
+    if (planners_.find(planner_id) != planners_.end()) {
+      return planners_[planner_id]->createPlan(start, goal);
+    } else {
+      if (planners_.size() == 1 && planner_id.empty()) {
+        RCLCPP_WARN_ONCE(
+          get_logger(), "No planners specified in action call. "
+          "Server will use only plugin %s in server."
+          " This warning will appear once.", planner_ids_concat_.c_str());
+        return planners_[planners_.begin()->first]->createPlan(start, goal);
+      } else {
+        RCLCPP_ERROR(
+          get_logger(), "planner %s is not a valid planner. "
+          "Planner names are: %s", planner_id.c_str(),
+          planner_ids_concat_.c_str());
+      }
+    }
+
+    return nav_msgs::msg::Path();
+  }
   
   bool validate_path(
     const geometry_msgs::msg::PoseStamped & goal,
