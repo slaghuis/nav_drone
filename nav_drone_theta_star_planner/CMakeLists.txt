@@ -1,11 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 project(nav_drone_theta_star_planner)
 
-# Default to C99
-if(NOT CMAKE_C_STANDARD)
-  set(CMAKE_C_STANDARD 99)
-endif()
-
 # Default to C++14
 if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 14)
@@ -25,25 +20,37 @@ find_package(tf2 REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 
-add_library(theta_star_planner src/theta_star_planner.cpp)
-target_include_directories(theta_star_planner PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
-ament_target_dependencies(
-  theta_star_planner
-  "pluginlib"
-  "tf2"
-  "nav_drone_core"
-  "nav_drone_util"
+include_directories(
+  include
 )
+
+set(library_name ${PROJECT_NAME})
+set(dependencies ament_cmake
+  pluginlib
+  nav_drone_core
+  nav_drone_util
+  tf2
+)
+
+add_library(${library_name} SHARED
+  src/theta_star_planner.cpp)
+  
+ament_target_dependencies(${library_name} ${dependencies})
 
 pluginlib_export_plugin_description_file(nav_drone_core nav_drone_theta_star_planner.xml)
 
-install(TARGETS theta_star_planner
-        EXPORT export_${PROJECT_NAME}
+install(TARGETS ${library_name}
         ARCHIVE DESTINATION lib
         LIBRARY DESTINATION lib
-        RUNTIME DESTINATION bin)
+        RUNTIME DESTINATION lib/${PROJECT_NAME})
+        
+install(DIRECTORY include/
+  DESTINATION include/
+)
+
+install(FILES nav_drone_theta_star_planner.xml
+  DESTINATION share/${PROJECT_NAME}
+)        
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -56,11 +63,8 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-ament_export_libraries(
-  theta_star_planner
-)
-ament_export_targets(
-  export_${PROJECT_NAME}
-)
+ament_export_include_directories(include)
+ament_export_libraries(${library_name})
+ament_export_dependencies(${dependencies})
 
 ament_package()

@@ -69,8 +69,8 @@ public:
   explicit PlannerServer(const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
   : Node("planner_server", options),
     loader_("nav_drone_core", "nav_drone_core::Planner"),
-    default_ids_{"DumbPlanner"},
-    default_types_{"nav_drone_dumb_planner/DumbPlanner"}
+    default_ids_{"DumbPlanner","ThetaStarPlanner"},
+    default_types_{"nav_drone_dumb_planner/DumbPlanner","nav_drone_theta_star_planner/ThetaStarPlanner"}
   {
     
     // Create a transform listener
@@ -275,58 +275,7 @@ private:
         goal_handle->abort(result);
         return;
     }
-    
-    /*  Cutout begins
-    pluginlib::ClassLoader<nav_drone_core::Planner> loader_("nav_drone_core", "nav_drone_core::Planner");
-    
-    try
-    {
-      //std::shared_ptr<nav_drone_core::Planner> path_planner = planner_loader.createSharedInstance( goal->planner_id );
-      planner_ = loader_.createSharedInstance(goal->planner_id);
-      auto node_ptr = shared_from_this(); 
-      planner_->configure(node_ptr, goal->planner_id, tf_buffer_, octomap_);
-
-      // If false, use current robot pose as path start, if true, use start above instead
-      if(goal->use_start == true) {
-        RCLCPP_DEBUG(this->get_logger(), "Planning a path from %.2f, %.2f, %.2f",
-          goal->start.pose.position.x, 
-          goal->start.pose.position.y, 
-          goal->start.pose.position.z);
-        result->path = planner_->createPlan( goal->start, goal->goal);
-      } else {
-        // use the current robot position.
-        geometry_msgs::msg::PoseStamped current_pos;
-        if( !nav_drone_util::getCurrentPose( current_pos,
-              *tf_buffer_, 
-              map_frame_, 
-              robot_base_frame_, 
-              transform_tolerance_) ) {   // From tf2
-          RCLCPP_ERROR(this->get_logger(), "Failed to read current position.  Aborting the action.");
-          goal_handle->abort(result);      
-          return;
-        }
-        RCLCPP_DEBUG(this->get_logger(), "Planning a path from %.2f, %.2f, %.2f",
-          current_pos.pose.position.x, 
-          current_pos.pose.position.y, 
-          current_pos.pose.position.z);
-          
-        result->path = planner_->createPlan( current_pos, goal->goal);
-      }
-      if( !validate_path( goal->goal, result->path, goal->planner_id)) {
-        // No valid goal was calculated
-        goal_handle->abort(result);
-        return;
-      }
-    }
-    
-    catch(pluginlib::PluginlibException& ex)
-    {
-      RCLCPP_ERROR(this->get_logger(), "The plugin failed to load for some reason. Error: %s", ex.what());
-      goal_handle->abort(result);
-      return;
-    }
-        
-    Cutout Ends */    
+      
     // Check if goal is done
     if (rclcpp::ok()) {
       auto cycle_duration = steady_clock_.now() - start_time;
