@@ -1,5 +1,5 @@
 # Planner Server
-An action server responding to ``nav_drone_msg::msg::ComputePathToPose`` messages.  Implements a plugin interface for the ``nav_drone_core::planner`` class
+An action server for ``nav_drone_msg::action::ComputePathToPose``. Typically called by the ``nav_drone_planner``. Implements a plugin interface for the ``nav_drone_core::planner`` class
 
 ## Depencencies
 node
