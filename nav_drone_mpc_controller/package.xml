@@ -24,6 +24,6 @@
 
   <export>
     <build_type>ament_cmake</build_type>
-    <nav_drone_core plugin="${prefix}/nav_drone_mpc_pursuit_controller.xml" />
+    <nav_drone_core plugin="${prefix}/nav_drone_mpc_controller.xml" />
   </export>
 </package>
