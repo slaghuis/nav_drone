@@ -27,6 +27,9 @@
 #include <chrono>
 #include <string>
 #include <thread>
+#include <unordered_map>
+#include <iterator>
+#include <vector>
 #include <limits>       // std::numeric_limits
 #include <cmath>        // std::hypot
 #include <mutex>
@@ -67,6 +70,7 @@ static const float DEFAULT_YAW_THRESHOLD = 0.025;       // Acceptible YAW deemed
 static const int DEFAULT_HOLDDOWN = 2;                  // Time to ensure stability in flight is attained
 
 using namespace std::chrono_literals;
+using namespace std::placeholders;
 
 namespace nav_drone
 {
@@ -76,14 +80,17 @@ class ControllerServer : public rclcpp::Node
 public:
   using FollowPath = nav_drone_msgs::action::FollowPath;
   using GoalHandleFollowPath = rclcpp_action::ServerGoalHandle<FollowPath>;
+  
+  using ControllerMap = std::unordered_map<std::string, nav_drone_core::Controller::Ptr>;
 
   NAV_DRONE_PUBLIC
   explicit ControllerServer(const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
   : Node("controller_server", options),
-    loader_("nav_drone_core", "nav_drone_core::Controller")
+    loader_("nav_drone_core", "nav_drone_core::Controller"),
+    default_ids_{"MPCController"},
+    default_types_{"nav_drone_mpc_controller/MPCController"}
   {
-    using namespace std::placeholders;
-    
+  
     // Create a transform listener
     tf_buffer_ =
       std::make_shared<tf2_ros::Buffer>(this->get_clock());      
@@ -105,6 +112,8 @@ public:
       this, "robot_base_frame", rclcpp::ParameterValue("base_link"));      
     nav_drone_util::declare_parameter_if_not_declared(
       this, "transform_tolerance", rclcpp::ParameterValue(0.1));      
+    declare_parameter("controller_plugins", default_ids_);
+    declare_parameter("controller_types", default_types_);  
       
     this->get_parameter("control_frequency", controller_frequency_);
     this->get_parameter("waypoint_radius_error", waypoint_radius_error_);
@@ -113,7 +122,86 @@ public:
     this->get_parameter("map_frame", map_frame_);
     this->get_parameter("robot_base_frame", robot_base_frame_);
     this->get_parameter("transform_tolerance", transform_tolerance_); 
+    this->get_parameter("controller_plugins", controller_ids_);
+    this->get_parameter("controller_types", controller_types_);
+    
+    one_off_timer_ = this->create_wall_timer(
+      200ms, std::bind(&ControllerServer::init, this));
 
+  }
+
+protected:
+  // Variables for node paramaters
+  float waypoint_radius_error_;
+  float yaw_threshold_;
+  int holddown_;
+  double controller_frequency_;
+  double transform_tolerance_;
+  std::string map_frame_;
+  std::string robot_base_frame_;
+
+
+  // Controller
+  ControllerMap controllers_;
+  pluginlib::ClassLoader<nav_drone_core::Controller> loader_;
+  std::vector<std::string> default_ids_;
+  std::vector<std::string> default_types_;
+  std::vector<std::string> controller_ids_;
+  std::vector<std::string> controller_types_;
+  double max_controller_duration_;
+  std::string controller_ids_concat_, current_controller_;
+
+  // Utility global variales
+  std::mutex server_mutex;   // Only allow one Action Server to address the drone at a time  
+  geometry_msgs::msg::Twist last_velocity_;
+  geometry_msgs::msg::PoseStamped end_pose_;
+  std::shared_ptr<nav_drone_util::HolddownTimer> holddown_timer_;
+  std::shared_ptr<octomap::OcTree> octomap_;
+  
+  rclcpp::Clock steady_clock_{RCL_STEADY_TIME};
+  rclcpp::TimerBase::SharedPtr one_off_timer_;
+    
+private:
+// VELOCITY PUBLISHER /////////////////////////////////////////////////////////////////////////////////////////////
+  rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr publisher_;  
+
+// TF2 VARIABLES
+  std::shared_ptr<tf2_ros::TransformListener> transform_listener_{nullptr};
+  std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
+
+void init()
+{
+    // Only run this once.  Stop the timer that triggered this.
+    this->one_off_timer_->cancel();
+       
+    // Setup the controllers
+    auto node = shared_from_this();
+
+    for (size_t i = 0; i != controller_ids_.size(); i++) {
+      try {
+        nav_drone_core::Controller::Ptr controller =
+          loader_.createUniqueInstance(controller_types_[i]);
+        RCLCPP_INFO(
+          get_logger(), "Created controller plugin %s of type %s",
+          controller_ids_[i].c_str(), controller_types_[i].c_str());
+          
+        controller->configure(node, controller_ids_[i], tf_buffer_, octomap_);
+        controllers_.insert({controller_ids_[i], controller});
+      } catch (const pluginlib::PluginlibException & ex) {
+        RCLCPP_FATAL(
+          get_logger(), "Failed to create controller. Exception: %s",
+          ex.what());
+      }
+    }
+
+    for (size_t i = 0; i != controller_ids_.size(); i++) {
+      controller_ids_concat_ += controller_ids_[i] + std::string(" ");
+    }
+
+    RCLCPP_INFO(
+      get_logger(),
+      "Controller Server has %s controllers available.", controller_ids_concat_.c_str());
+    
     holddown_timer_ = std::make_shared<nav_drone_util::HolddownTimer>(holddown_);    
     
     // Create drone velocity publisher
@@ -134,37 +222,8 @@ public:
       std::bind(&ControllerServer::handle_goal, this, _1, _2),
       std::bind(&ControllerServer::handle_cancel, this, _1),
       std::bind(&ControllerServer::handle_accepted, this, _1));
-  }
 
-protected:
-  // Variables for node paramaters
-  float waypoint_radius_error_;
-  float yaw_threshold_;
-  int holddown_;
-  double controller_frequency_;
-  double transform_tolerance_;
-  std::string map_frame_;
-  std::string robot_base_frame_;
-
-  // For the plugins
-  pluginlib::ClassLoader<nav_drone_core::Controller> loader_;
-  std::shared_ptr<nav_drone_core::Controller> controller_;
-
-  // Utility global variales
-  std::mutex server_mutex;   // Only allow one Action Server to address the drone at a time  
-  geometry_msgs::msg::Twist last_velocity_;
-  geometry_msgs::msg::PoseStamped end_pose_;
-  std::shared_ptr<nav_drone_util::HolddownTimer> holddown_timer_;
-  std::shared_ptr<octomap::OcTree> octomap_;
-    
-private:
-// VELOCITY PUBLISHER /////////////////////////////////////////////////////////////////////////////////////////////
-  rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr publisher_;  
-
-// TF2 VARIABLES
-  std::shared_ptr<tf2_ros::TransformListener> transform_listener_{nullptr};
-  std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
-
+}
 
 // MAP SUBSCRIPTION ////////////////////////////////////////////////////////////////////////////////////////////////
   void map_callback(const octomap_msgs::msg::Octomap::SharedPtr msg) 
@@ -298,16 +357,18 @@ private:
     }
     
     try
-    {
-      //std::string controller_base_name = "controller_plugins::"; 
-      //controller_ = loader_.createSharedInstance(controller_base_name.append( goal->controller_id ));  //"controller_plugins::PurePursuitController"
-      //controller_ = loader_.createSharedInstance( goal->controller_id );
-      controller_ = loader_.createSharedInstance("nav_drone_mpc_controller::MPCController");
-      auto node_ptr = shared_from_this(); 
-      controller_->configure(node_ptr, goal->controller_id, tf_buffer_, octomap_);
-      controller_->setPath( goal->path );
+    {    
+      std::string c_name = goal->controller_id;
+      std::string current_controller;
+      if (findControllerId(c_name, current_controller)) {
+        current_controller_ = current_controller;
+      } else {
+        throw nav_drone_core::DroneException("Failed to load the controller.");
+      }
+      
+      controllers_[current_controller_]->setPath( goal->path );
             
-      rclcpp::Rate loop_rate( controller_frequency_ );
+      rclcpp::WallRate loop_rate( controller_frequency_ );
       while ( rclcpp::ok() ) {
          // Check if there is a cancelling request
         if (goal_handle->is_canceling()) {
@@ -326,14 +387,18 @@ private:
         }
 
         // Check if the robot is stuck here (for longer than a timeout)
+        
+        
         try {
           geometry_msgs::msg::TwistStamped setpoint;
-          setpoint = controller_->computeVelocityCommands( pose, last_velocity_);      
+          setpoint = controllers_[current_controller_]->computeVelocityCommands( pose, last_velocity_);      
+
           RCLCPP_INFO(this->get_logger(), "Publishing velocity [%.2f, %.2f, %.2f, %.4f]", 
             setpoint.twist.linear.x, 
             setpoint.twist.linear.y, 
             setpoint.twist.linear.z,
             setpoint.twist.angular.z);
+            
           publisher_->publish( setpoint.twist ); 
 
           // Publish feedback
@@ -361,7 +426,7 @@ private:
       if (rclcpp::ok() ) { 
         goal_handle->succeed(result);
       }
-      stop_movement();
+      stop_movement();    // Just to make sure.
     
     }
     catch(pluginlib::PluginlibException& ex)
@@ -380,6 +445,32 @@ private:
     }
         
     server_mutex.unlock();  
+  }
+  
+  bool findControllerId(
+    const std::string & c_name,
+    std::string & current_controller) 
+  {
+    if (controllers_.find(c_name) == controllers_.end()) {
+      if (controllers_.size() == 1 && c_name.empty()) {
+        RCLCPP_WARN_ONCE(
+          get_logger(), "No controller was specified in action call."
+          " Server will use only plugin loaded %s. "
+          "This warning will appear once.", controller_ids_concat_.c_str());
+        current_controller = controllers_.begin()->first;
+      } else {
+        RCLCPP_ERROR(
+          get_logger(), "FollowPath called with controller name %s, "
+          "which does not exist. Available controllers are: %s.",
+          c_name.c_str(), controller_ids_concat_.c_str());
+        return false;
+      }
+    } else {
+      RCLCPP_DEBUG(get_logger(), "Selected controller: %s.", c_name.c_str());
+      current_controller = c_name;
+    }
+
+    return true;
   }
   
 // UTILITIES THAT SHOULD BE IN THE GOAL CHECKER PLUGIN  

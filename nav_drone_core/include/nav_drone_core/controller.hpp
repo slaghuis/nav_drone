@@ -18,6 +18,8 @@ namespace nav_drone_core
   class Controller
   {
     public:
+      using Ptr = std::shared_ptr<Controller>;
+    
       virtual void configure(const rclcpp::Node::SharedPtr parent, 
                              std::string name, std::shared_ptr<tf2_ros::Buffer> tf,
                              std::shared_ptr<octomap::OcTree> costmap ) = 0;
