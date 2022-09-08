@@ -246,11 +246,15 @@ void init()
     
     float transform_timeout = 0.1;
     try {
-      geometry_msgs::msg::TwistStamped velocity;
-      velocity.twist = msg->twist.twist;
-      velocity.header = msg->header;
+      //geometry_msgs::msg::TwistStamped velocity;
+      //velocity.twist = msg->twist.twist;
+      //velocity.header = msg->header;
       
-      last_velocity_ = tf_buffer_->transform(velocity, robot_base_frame_, tf2::durationFromSec(transform_timeout));
+      //last_velocity_ = tf_buffer_->transform(velocity, robot_base_frame_, tf2::durationFromSec(transform_timeout));
+      last_velocity_.twist.linear.x = msg->twist.twist.linear.x;
+      last_velocity_.twist.linear.y = - msg->twist.twist.linear.y;
+      last_velocity_.twist.linear.x = - msg->twist.twist.linear.z;
+      last_velocity_.twist.angular.z = - msg->twist.twist.angular.z;
     } catch (tf2::LookupException & ex) {
       RCLCPP_ERROR(
         this->get_logger(),
