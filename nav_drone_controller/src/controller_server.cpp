@@ -153,7 +153,7 @@ protected:
 
   // Utility global variales
   std::mutex server_mutex;   // Only allow one Action Server to address the drone at a time  
-  geometry_msgs::msg::Twist last_velocity_;
+  geometry_msgs::msg::TwistStamped last_velocity_;
   geometry_msgs::msg::PoseStamped end_pose_;
   std::shared_ptr<nav_drone_util::HolddownTimer> holddown_timer_;
   std::shared_ptr<octomap::OcTree> octomap_;
@@ -242,11 +242,15 @@ void init()
   void odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg) 
   {
     // The twist in the odometry message is published in a frame with orientation matching the flight controller,
-    // We need to tranform the speed to the base_link frame 
-    //last_velocity_ = msg->twist.twist;
+    // We need to tranform the speed to the robot base frame 
+    
     float transform_timeout = 0.1;
     try {
-      last_velocity_ = tf_buffer_->transform(msg->twist.twist, robot_base_frame_, tf2::durationFromSec(transform_timeout));
+      geometry_msgs::msg::TwistStamped velocity;
+      velocity.twist = msg->twist.twist;
+      velocity.header = msg->header;
+      
+      last_velocity_ = tf_buffer_->transform(velocity, robot_base_frame_, tf2::durationFromSec(transform_timeout));
     } catch (tf2::LookupException & ex) {
       RCLCPP_ERROR(
         this->get_logger(),
@@ -273,9 +277,7 @@ void init()
 
 // FLIGHT CONTROL ////////////////////////////////////////////////////////////////////////////////////////////////
   bool stop_movement() 
-  {
-    rclcpp::Rate loop_rate(2);
-    
+  {    
     geometry_msgs::msg::Twist setpoint = geometry_msgs::msg::Twist();
     
     setpoint.angular.x = 0.0;
@@ -285,9 +287,8 @@ void init()
     setpoint.linear.x = 0.0;
     setpoint.linear.y = 0.0;  
     setpoint.linear.z = 0.0;  
+    
     publisher_->publish(setpoint);        
-    loop_rate.sleep();    
-    publisher_->publish(setpoint); // Just to be sure :-)       
     
     return true;
   }
@@ -391,7 +392,7 @@ void init()
         
         try {
           geometry_msgs::msg::TwistStamped setpoint;
-          setpoint = controllers_[current_controller_]->computeVelocityCommands( pose, last_velocity_);      
+          setpoint = controllers_[current_controller_]->computeVelocityCommands( pose, last_velocity_.twist);      
 
           RCLCPP_INFO(this->get_logger(), "Publishing velocity [%.2f, %.2f, %.2f, %.4f]", 
             setpoint.twist.linear.x, 
@@ -402,7 +403,7 @@ void init()
           publisher_->publish( setpoint.twist ); 
 
           // Publish feedback
-          speed = std::hypot( double(last_velocity_.linear.x), double(last_velocity_.linear.y), double(last_velocity_.linear.z) );
+          speed = std::hypot( double(last_velocity_.twist.linear.x), double(last_velocity_.twist.linear.y), double(last_velocity_.twist.linear.z) );
           size_t current_idx = nav_drone_util::find_closest_goal_idx( pose, goal->path); 
           distance_to_goal = nav_drone_util::calculate_path_length( goal->path, current_idx );
           goal_handle->publish_feedback(feedback);

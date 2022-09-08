@@ -42,22 +42,22 @@ target_include_directories(controller_action_server PRIVATE
 target_compile_definitions(controller_action_server
   PRIVATE "NAV_DRONE_BUILDING_DLL")
 ament_target_dependencies(controller_action_server
-  "rclcpp"
-  "rclcpp_action"
-  "rclcpp_components"
-  "nav_drone_core"
-  "nav_drone_util"
-  "nav_drone_msgs"
-  "std_msgs"
-  "geometry_msgs"
-  "nav_msgs"
-  "tf2" 
-  "tf2_ros" 
-  "tf2_msgs"
-  "tf2_geometry_msgs"
-  "pluginlib"
-  "octomap"
-  "octomap_msgs")
+  rclcpp
+  rclcpp_action
+  rclcpp_components
+  nav_drone_core
+  nav_drone_util
+  nav_drone_msgs
+  std_msgs
+  geometry_msgs
+  nav_msgs
+  tf2
+  tf2_ros
+  tf2_msgs
+  tf2_geometry_msgs
+  pluginlib
+  octomap
+  octomap_msgs)
 rclcpp_components_register_node(controller_action_server PLUGIN "nav_drone::ControllerServer" EXECUTABLE controller_server)
 install(TARGETS
   controller_action_server
