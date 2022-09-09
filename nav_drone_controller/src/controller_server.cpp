@@ -358,7 +358,7 @@ void init()
         // Compute and publish velocity
         geometry_msgs::msg::PoseStamped pose;   
         
-        if (nav_drone_util::getCurrentPose(pose, *tf_buffer_, map_frame_, robot_base_frame_, transform_tolerance_)) {
+        if (!nav_drone_util::getCurrentPose(pose, *tf_buffer_, map_frame_, robot_base_frame_, transform_tolerance_)) {
           throw nav_drone_core::DroneException("Failed to obtain robot pose.");
         }
 
