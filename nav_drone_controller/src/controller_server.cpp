@@ -127,7 +127,6 @@ public:
     
     one_off_timer_ = this->create_wall_timer(
       200ms, std::bind(&ControllerServer::init, this));
-
   }
 
 protected:
@@ -241,41 +240,13 @@ void init()
 // ODOM SUBSCRIPTION ////////////////////////////////////////////////////////////////////////////////////////////////
   void odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg) 
   {
-    // The twist in the odometry message is published in a frame with orientation matching the flight controller,
-    // We need to tranform the speed to the robot base frame 
+    // The twist in the odometry message is published in a frame (FRD) with orientation matching the flight controller,
+    // We need to tranform the speed to the robot base frame (FLU). Do that by flipping left <-->right, and up <--> down.  
     
-    float transform_timeout = 0.1;
-    try {
-      //geometry_msgs::msg::TwistStamped velocity;
-      //velocity.twist = msg->twist.twist;
-      //velocity.header = msg->header;
-      
-      //last_velocity_ = tf_buffer_->transform(velocity, robot_base_frame_, tf2::durationFromSec(transform_timeout));
-      last_velocity_.twist.linear.x = msg->twist.twist.linear.x;
-      last_velocity_.twist.linear.y = - msg->twist.twist.linear.y;
-      last_velocity_.twist.linear.x = - msg->twist.twist.linear.z;
-      last_velocity_.twist.angular.z = - msg->twist.twist.angular.z;
-    } catch (tf2::LookupException & ex) {
-      RCLCPP_ERROR(
-        this->get_logger(),
-        "No Transform available Error looking up target frame: %s\n", ex.what());
-    } catch (tf2::ConnectivityException & ex) {
-      RCLCPP_ERROR(
-        this->get_logger(),
-        "Connectivity Error looking up target frame: %s\n", ex.what());
-    } catch (tf2::ExtrapolationException & ex) {
-      RCLCPP_ERROR(
-        this->get_logger(),
-        "Extrapolation Error looking up target frame: %s\n", ex.what());
-    } catch (tf2::TimeoutException & ex) {
-      RCLCPP_ERROR(
-        this->get_logger(),
-        "Transform timeout with tolerance: %.4f", transform_timeout);
-    } catch (tf2::TransformException & ex) {
-      RCLCPP_ERROR(
-        this->get_logger(), "Failed to transform from %s to %s",
-        msg->child_frame_id.c_str(), robot_base_frame_.c_str());
-    }  
+    last_velocity_.twist.linear.x = msg->twist.twist.linear.x;
+    last_velocity_.twist.linear.y = - msg->twist.twist.linear.y;
+    last_velocity_.twist.linear.x = - msg->twist.twist.linear.z;
+    last_velocity_.twist.angular.z = - msg->twist.twist.angular.z;
   }
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_subscription_;
 
