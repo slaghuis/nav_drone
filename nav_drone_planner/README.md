@@ -1,5 +1,5 @@
 # Planner Server
-An action server for ``nav_drone_msg::action::ComputePathToPose``. Typically called by the ``nav_drone_planner``. Implements a plugin interface for the ``nav_drone_core::planner`` class
+An action server for ``nav_drone_msg::action::ComputePathToPose``. Typically called by the `nav_drone_bt_navigator` `ComputePathToPose` action from this repository. Implements a plugin interface for the ``nav_drone_core::planner`` class
 
 ## Depencencies
   - Only the packages listed in CMakeLists.txt
@@ -13,7 +13,8 @@ Whilst running the:
   
 Run the following and see a path returned
 ```
-ros2 action send_goal /nav_drone/compute_path_to_pose "nav_drone_msgs/action/ComputePathToPose" '{planner_id: "DumbPlanner", use_start: True, start: {pose: {position: {x: 0, y: 0, z: 5}}}, goal: {pose: {position: {x: 1, y: 7, z: 5}}}}' 
+ros2 action send_goal /nav_drone/compute_path_to_pose "nav_drone_msgs/action/ComputePathToPose" '{planner_id: "DumbPlanner", use_start: True, start: {header: {frame_id: 'map'}, pose: {position: {x: 0, y: 0, z: 5}}}, goal: {header: {frame_id: 'map'}, pose: {position: {x: 1, y: 7, z: 5}}}}'
+
 ```
 
 # Code Status
