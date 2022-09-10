@@ -335,7 +335,14 @@ geometry_msgs::msg::PoseStamped MPCController::getLookAheadPoint(
      
   Histogram histogram(ALPHA_RES);
   histogram.set_zero();
-  RCLCPP_INFO(logger_, "Two - Four - One");   
+  RCLCPP_INFO(logger_, "Two - Four - One");
+  
+  /* Deugging Code */
+  
+  if(costmap_ == nullptr){ 
+    RCLCPP_INFO(logger_, "Costmap is null, how did we get here.  Crashing....");
+  } 
+    
   for(octomap::OcTree::leaf_bbx_iterator it = costmap_->begin_leafs_bbx(min,max),
     end=costmap_->end_leafs_bbx(); it!= end; ++it) {
     RCLCPP_INFO(logger_, "Two - Four - Two");   
