@@ -30,7 +30,6 @@
 #include "nav_drone_util/node_utils.hpp"
 #include "nav_drone_util/angle_utils.hpp"
 #include "nav_drone_util/robot_utils.hpp"
-//#include "nav2_costmap_2d/costmap_filters/filter_values.hpp"
 
 #include "pluginlib/class_list_macros.hpp"
 
@@ -177,9 +176,10 @@ geometry_msgs::msg::TwistStamped MPCController::computeVelocityCommands(
       const geometry_msgs::msg::PoseStamped & pose,
       const geometry_msgs::msg::Twist & speed) 
 {
+  RCLCPP_INFO(logger_, "One");
   double lookahead_dist = getLookAheadDistance(speed);
   auto goal_pose = getLookAheadPoint(lookahead_dist, pose);
-  
+  RCLCPP_INFO(logger_, "Two");
   // Transform the goal_pose to the base_link frame.  Now flight is realtive to the 
   // current position.
   //geometry_msgs::msg::PoseStamped carrot_pose;
@@ -192,7 +192,7 @@ geometry_msgs::msg::TwistStamped MPCController::computeVelocityCommands(
            goal_pose.pose.position.z,  
            0, 0, 0; // Position, at zero velocity
   controller->set_target(target);
-  
+  RCLCPP_INFO(logger_, "Three");
   // Find the best control action given our current state.
   dlib::matrix<double,STATES,1> current_state;
   current_state = pose.pose.position.x,
@@ -202,7 +202,7 @@ geometry_msgs::msg::TwistStamped MPCController::computeVelocityCommands(
                   speed.linear.y,
                   speed.linear.z;
   dlib::matrix<double,CONTROLS,1> action = (*controller)(current_state);
-
+  RCLCPP_INFO(logger_, "Four");
   geometry_msgs::msg::TwistStamped setpoint = geometry_msgs::msg::TwistStamped();
   setpoint.header.frame_id = "map";         //carrot_pose.header.frame_id;   // "base_link";
   setpoint.header.stamp = clock_->now();
