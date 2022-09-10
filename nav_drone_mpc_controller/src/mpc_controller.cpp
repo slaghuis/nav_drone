@@ -331,19 +331,20 @@ geometry_msgs::msg::PoseStamped MPCController::getLookAheadPoint(
                                 
   double const_b = 5.0;    // Just a random number
   double const_a = 1.0 + const_b * pow((bounding_box_radius - 1.0) / 2, 2);
-    RCLCPP_INFO(logger_, "Two - Four");
+  RCLCPP_INFO(logger_, "Two - Four");
      
   Histogram histogram(ALPHA_RES);
   histogram.set_zero();
-     
+  RCLCPP_INFO(logger_, "Two - Four - One");   
   for(octomap::OcTree::leaf_bbx_iterator it = costmap_->begin_leafs_bbx(min,max),
     end=costmap_->end_leafs_bbx(); it!= end; ++it) {
+    RCLCPP_INFO(logger_, "Two - Four - Two");   
              
     octomap::point3d end_point(it.getCoordinate());
     double distance = start_point.distance(end_point);
     double l = distance - (robot_radius_ + safety_radius_ + costmap_->getResolution());
     if ( (distance <= bounding_box_radius) && (l > 0.001) )  {   // Work in the drone radius, to minimuse calculation.
-        
+      RCLCPP_INFO(logger_, "Two - Four - Three");  
       // The point is within a sphere around the drone, thus an active cell
       std::pair<int, int> coords = get_ez_grid_pos(end_point);   // NOTE this point is in the base_link frame.  Remember when translating to the lookahead point    
       int lamda = floor(nav_drone_util::rad_to_deg( asin((robot_radius_ + safety_radius_ + costmap_->getResolution()) / distance) / ALPHA_RES));
@@ -354,10 +355,11 @@ geometry_msgs::msg::PoseStamped MPCController::getLookAheadPoint(
         // Incorporate the size of the robot in the calculation.  All these points in the histogram are influenced
         for(int e = std::max(0, coords.first-lamda); e <= coords.first+lamda; e++) {
           for(int z = std::max(0, coords.second-lamda); z <= coords.second+lamda; z++) {
-              
+            RCLCPP_INFO(logger_, "Two - Four - Four");  
             // Trim all values of e & z that are out of bounds, because we add or subtract lamda
             if ((e < histogram.e_dim()) && ( z < histogram.z_dim() )) {  
               histogram.add_weight(e, z, weight);
+              RCLCPP_INFO(logger_, "Two - Four - Five");
             }  
           }             
         }
