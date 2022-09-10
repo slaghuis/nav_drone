@@ -178,8 +178,9 @@ geometry_msgs::msg::TwistStamped MPCController::computeVelocityCommands(
 {
   RCLCPP_INFO(logger_, "One");
   double lookahead_dist = getLookAheadDistance(speed);
-  auto goal_pose = getLookAheadPoint(lookahead_dist, pose);
   RCLCPP_INFO(logger_, "Two");
+  auto goal_pose = getLookAheadPoint(lookahead_dist, pose);
+  RCLCPP_INFO(logger_, "Three");
   // Transform the goal_pose to the base_link frame.  Now flight is realtive to the 
   // current position.
   //geometry_msgs::msg::PoseStamped carrot_pose;
@@ -192,7 +193,7 @@ geometry_msgs::msg::TwistStamped MPCController::computeVelocityCommands(
            goal_pose.pose.position.z,  
            0, 0, 0; // Position, at zero velocity
   controller->set_target(target);
-  RCLCPP_INFO(logger_, "Three");
+
   // Find the best control action given our current state.
   dlib::matrix<double,STATES,1> current_state;
   current_state = pose.pose.position.x,
@@ -290,18 +291,18 @@ std::pair<double, double> MPCController::get_ez(const geometry_msgs::msg::PoseSt
 }
 
 // This applies the 3DVFH+ algorithm for local planning
-// The input and rsult result is in the map frame
-  
+// The input and result is in the map frame  
 geometry_msgs::msg::PoseStamped MPCController::getLookAheadPoint(
   const double & lookahead_dist,
   const geometry_msgs::msg::PoseStamped & current_pose)
 {    
-
+  RCLCPP_INFO(logger_, "Two - One");
   // Find the first pose which is at a distance greater than the lookahead distance
   auto goal_pose_it = std::find_if(
     global_plan_.poses.begin(), global_plan_.poses.end(), [&](const auto & ps) {
       return (nav_drone_util::euclidean_distance(ps, current_pose) >= lookahead_dist);
     });
+  RCLCPP_INFO(logger_, "Two - Two");
     
   double bounding_box_radius = lookahead_dist;
     
@@ -310,7 +311,8 @@ geometry_msgs::msg::PoseStamped MPCController::getLookAheadPoint(
     goal_pose_it = std::prev(global_plan_.poses.end());
     bounding_box_radius = nav_drone_util::euclidean_distance(current_pose, *goal_pose_it, true);
   }    
-                     
+    RCLCPP_INFO(logger_, "Two - Three");
+                   
   if (bounding_box_radius < 0.5 ) {    // Too close to calculate anything usable
     return *goal_pose_it;
   }  
@@ -329,7 +331,8 @@ geometry_msgs::msg::PoseStamped MPCController::getLookAheadPoint(
                                 
   double const_b = 5.0;    // Just a random number
   double const_a = 1.0 + const_b * pow((bounding_box_radius - 1.0) / 2, 2);
-       
+    RCLCPP_INFO(logger_, "Two - Four");
+     
   Histogram histogram(ALPHA_RES);
   histogram.set_zero();
      
@@ -372,6 +375,8 @@ geometry_msgs::msg::PoseStamped MPCController::getLookAheadPoint(
        speed, the window size of stage  ve, the octomap resolution and the bounding
        sphere size.
   */
+
+    RCLCPP_INFO(logger_, "Two - Five");
 
   histogram.go_binary(0.03, 0.3);      // See note above.  Using constants for now
     
