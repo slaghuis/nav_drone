@@ -107,9 +107,6 @@ protected:
   std::string robot_base_frame_;
   double transform_tolerance_;
     
-  // For the plugins
-  //std::shared_ptr<nav_drone_core::Planner> planner_;
-  
   // Planner
   PlannerMap planners_;
   pluginlib::ClassLoader<nav_drone_core::Planner> loader_;
@@ -131,8 +128,6 @@ private:
   rclcpp::TimerBase::SharedPtr one_off_timer_;
   
   void init() {
-    using namespace std::placeholders;
-  
     // Only run this once.  Stop the timer that triggered this.
     this->one_off_timer_->cancel();
     
@@ -314,6 +309,7 @@ private:
       goal.pose.position.x, goal.pose.position.y, goal.pose.position.z);
 
     if (planners_.find(planner_id) != planners_.end()) {
+      planners_[planner_id]->updateMap( octomap_ );
       return planners_[planner_id]->createPlan(start, goal);
     } else {
       if (planners_.size() == 1 && planner_id.empty()) {

@@ -21,6 +21,8 @@ namespace nav_drone_core
                              std::string name, std::shared_ptr<tf2_ros::Buffer> tf,
                              std::shared_ptr<octomap::OcTree> costmap ) = 0;
     
+      virtual void updateMap(std::shared_ptr<octomap::OcTree> costmap) = 0;
+    
       virtual nav_msgs::msg::Path createPlan( const geometry_msgs::msg::PoseStamped & start,
                                               const geometry_msgs::msg::PoseStamped & goal) = 0;
     

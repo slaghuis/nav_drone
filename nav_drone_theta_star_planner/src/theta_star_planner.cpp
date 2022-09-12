@@ -44,6 +44,11 @@ namespace nav_drone_theta_star_planner
         node_->get_parameter(plugin_name_ + ".weight", weight_);     
       }
       
+      void updateMap(std::shared_ptr<octomap::OcTree> costmap) override
+      {
+        costmap_ = costmap;
+      }
+      
       nav_msgs::msg::Path createPlan( const geometry_msgs::msg::PoseStamped & start,
                                       const geometry_msgs::msg::PoseStamped & goal) override
       {            
