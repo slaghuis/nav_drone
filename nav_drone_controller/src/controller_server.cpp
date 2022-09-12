@@ -343,6 +343,7 @@ void init()
       }
       
       controllers_[current_controller_]->setPath( goal->path );
+      controllers_[current_controller_]->updateMap( octomap_ );
             
       rclcpp::WallRate loop_rate( controller_frequency_ );
       while ( rclcpp::ok() ) {

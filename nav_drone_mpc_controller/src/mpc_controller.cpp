@@ -171,16 +171,19 @@ void MPCController::setPath(const nav_msgs::msg::Path & path)
 {
   global_plan_ = path;
 }
+  
+void MPCController::updateMap(std::shared_ptr<octomap::OcTree> costmap)
+{
+  costmap_ = costmap;
+}
+  
     
 geometry_msgs::msg::TwistStamped MPCController::computeVelocityCommands(
       const geometry_msgs::msg::PoseStamped & pose,
       const geometry_msgs::msg::Twist & speed) 
 {
-  RCLCPP_INFO(logger_, "One");
   double lookahead_dist = getLookAheadDistance(speed);
-  RCLCPP_INFO(logger_, "Two");
   auto goal_pose = getLookAheadPoint(lookahead_dist, pose);
-  RCLCPP_INFO(logger_, "Three");
   // Transform the goal_pose to the base_link frame.  Now flight is realtive to the 
   // current position.
   //geometry_msgs::msg::PoseStamped carrot_pose;
@@ -203,7 +206,6 @@ geometry_msgs::msg::TwistStamped MPCController::computeVelocityCommands(
                   speed.linear.y,
                   speed.linear.z;
   dlib::matrix<double,CONTROLS,1> action = (*controller)(current_state);
-  RCLCPP_INFO(logger_, "Four");
   geometry_msgs::msg::TwistStamped setpoint = geometry_msgs::msg::TwistStamped();
   setpoint.header.frame_id = "map";         //carrot_pose.header.frame_id;   // "base_link";
   setpoint.header.stamp = clock_->now();
@@ -296,13 +298,11 @@ geometry_msgs::msg::PoseStamped MPCController::getLookAheadPoint(
   const double & lookahead_dist,
   const geometry_msgs::msg::PoseStamped & current_pose)
 {    
-  RCLCPP_INFO(logger_, "Two - One");
   // Find the first pose which is at a distance greater than the lookahead distance
   auto goal_pose_it = std::find_if(
     global_plan_.poses.begin(), global_plan_.poses.end(), [&](const auto & ps) {
       return (nav_drone_util::euclidean_distance(ps, current_pose) >= lookahead_dist);
     });
-  RCLCPP_INFO(logger_, "Two - Two");
     
   double bounding_box_radius = lookahead_dist;
     
@@ -311,7 +311,6 @@ geometry_msgs::msg::PoseStamped MPCController::getLookAheadPoint(
     goal_pose_it = std::prev(global_plan_.poses.end());
     bounding_box_radius = nav_drone_util::euclidean_distance(current_pose, *goal_pose_it, true);
   }    
-    RCLCPP_INFO(logger_, "Two - Three");
                    
   if (bounding_box_radius < 0.5 ) {    // Too close to calculate anything usable
     return *goal_pose_it;
@@ -331,16 +330,14 @@ geometry_msgs::msg::PoseStamped MPCController::getLookAheadPoint(
                                 
   double const_b = 5.0;    // Just a random number
   double const_a = 1.0 + const_b * pow((bounding_box_radius - 1.0) / 2, 2);
-  RCLCPP_INFO(logger_, "Two - Four");
      
   Histogram histogram(ALPHA_RES);
   histogram.set_zero();
-  RCLCPP_INFO(logger_, "Two - Four - One");
-  
-  /* Deugging Code */
+//  RCLCPP_INFO(logger_, "Two - Four - One");
   
   if(costmap_ == nullptr){ 
-    RCLCPP_INFO(logger_, "Costmap is null, how did we get here.  Crashing....");
+    RCLCPP_ERROR(logger_, "Costmap is null.  Did you provide an updated map? ");
+    return *goal_pose_it;
   } 
     
   for(octomap::OcTree::leaf_bbx_iterator it = costmap_->begin_leafs_bbx(min,max),

@@ -25,6 +25,7 @@ namespace nav_drone_core
                              std::shared_ptr<octomap::OcTree> costmap ) = 0;
     
       virtual void setPath(const nav_msgs::msg::Path & path) = 0;
+      virtual void updateMap(std::shared_ptr<octomap::OcTree> costmap) = 0;
     
       virtual geometry_msgs::msg::TwistStamped computeVelocityCommands(
         const geometry_msgs::msg::PoseStamped & pose,

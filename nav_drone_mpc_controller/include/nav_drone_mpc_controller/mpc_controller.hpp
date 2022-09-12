@@ -30,6 +30,7 @@ class MPCController : public nav_drone_core::Controller
       std::shared_ptr<octomap::OcTree> costmap ) override;
     
     void setPath(const nav_msgs::msg::Path & path) override;
+    void updateMap(std::shared_ptr<octomap::OcTree> costmap) override;
     
     geometry_msgs::msg::TwistStamped computeVelocityCommands(
       const geometry_msgs::msg::PoseStamped & pose,
