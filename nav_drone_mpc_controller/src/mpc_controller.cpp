@@ -311,7 +311,10 @@ geometry_msgs::msg::PoseStamped MPCController::getLookAheadPoint(
     goal_pose_it = std::prev(global_plan_.poses.end());
     bounding_box_radius = nav_drone_util::euclidean_distance(current_pose, *goal_pose_it, true);
   }    
-                   
+           
+  // Bail out here to find some speed.  This is will negate obstacle avoidance!
+  return *goal_pose_it;
+  
   if (bounding_box_radius < 0.5 ) {    // Too close to calculate anything usable
     return *goal_pose_it;
   }  
@@ -342,13 +345,11 @@ geometry_msgs::msg::PoseStamped MPCController::getLookAheadPoint(
     
   for(octomap::OcTree::leaf_bbx_iterator it = costmap_->begin_leafs_bbx(min,max),
     end=costmap_->end_leafs_bbx(); it!= end; ++it) {
-    RCLCPP_INFO(logger_, "Two - Four - Two");   
              
     octomap::point3d end_point(it.getCoordinate());
     double distance = start_point.distance(end_point);
     double l = distance - (robot_radius_ + safety_radius_ + costmap_->getResolution());
     if ( (distance <= bounding_box_radius) && (l > 0.001) )  {   // Work in the drone radius, to minimuse calculation.
-      RCLCPP_INFO(logger_, "Two - Four - Three");  
       // The point is within a sphere around the drone, thus an active cell
       std::pair<int, int> coords = get_ez_grid_pos(end_point);   // NOTE this point is in the base_link frame.  Remember when translating to the lookahead point    
       int lamda = floor(nav_drone_util::rad_to_deg( asin((robot_radius_ + safety_radius_ + costmap_->getResolution()) / distance) / ALPHA_RES));
@@ -363,7 +364,6 @@ geometry_msgs::msg::PoseStamped MPCController::getLookAheadPoint(
             // Trim all values of e & z that are out of bounds, because we add or subtract lamda
             if ((e < histogram.e_dim()) && ( z < histogram.z_dim() )) {  
               histogram.add_weight(e, z, weight);
-              RCLCPP_INFO(logger_, "Two - Four - Five");
             }  
           }             
         }
@@ -381,8 +381,6 @@ geometry_msgs::msg::PoseStamped MPCController::getLookAheadPoint(
        speed, the window size of stage  ve, the octomap resolution and the bounding
        sphere size.
   */
-
-    RCLCPP_INFO(logger_, "Two - Five");
 
   histogram.go_binary(0.03, 0.3);      // See note above.  Using constants for now
     
