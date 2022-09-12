@@ -19,6 +19,10 @@ find_package(tf2 REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 
+include_directories(
+  include
+)
+
 set(library_name ${PROJECT_NAME})
 set(dependencies ament_cmake
   pluginlib
@@ -37,6 +41,10 @@ install(TARGETS ${library_name}
         LIBRARY DESTINATION lib
         RUNTIME DESTINATION lib/${PROJECT_NAME})
         
+install(DIRECTORY include/
+  DESTINATION include/
+)
+
 install(FILES nav_drone_dumb_planner.xml
   DESTINATION share/${PROJECT_NAME}
 )        
@@ -52,6 +60,7 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
+ament_export_include_directories(include)
 ament_export_libraries(${library_name})
 ament_export_dependencies(${dependencies})
 

@@ -35,6 +35,11 @@ namespace nav_drone_dumb_planner
         costmap_ = costmap;    
       }
       
+      void updateMap(std::shared_ptr<octomap::OcTree> costmap) override
+      {
+        costmap_ = costmap;
+      }
+      
       nav_msgs::msg::Path createPlan( const geometry_msgs::msg::PoseStamped & start,
                                       const geometry_msgs::msg::PoseStamped & goal) override
       {            
