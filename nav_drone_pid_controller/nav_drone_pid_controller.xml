@@ -1,0 +1,5 @@
+<library path="nav_drone_pid_controller">
+  <class name="nav_drone_pid_controller/PIDController" type="nav_drone_pid_controller::PIDController" base_class_type="nav_drone_core::Controller">
+    <description>Proportional Integral Derivative controller</description>
+  </class>
+</library>
