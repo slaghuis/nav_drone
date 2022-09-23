@@ -152,13 +152,15 @@ geometry_msgs::msg::TwistStamped PIDController::computeVelocityCommands(
   double vel_y = 0.0;
   double vel_z = 0.0;
   double vel_w = 0.0;  // Where w = yaw
+  
+  RCLCPP_INFO(logger_, "xy_distance %.2f, current x %.2f, goal x %.2f", xy_distance, pose.pose.position.x, goal_pose.pose.position.x);
 
   // If XY is close, use both velocities to fine tune the position
   if (xy_distance < yaw_control_limit_) { 
+      RCLCPP_INFO(logger_, "XY is close, fine tune in both dimentions");
      vel_x = pid_x->calculate(0, pose.pose.position.x - goal_pose.pose.position.x);
      vel_y = pid_y->calculate(0, pose.pose.position.y - goal_pose.pose.position.y);
   } else {  
-
     double yaw_to_target = nav_drone_util::angle(
       pose.pose.position.x,
       pose.pose.position.y,
@@ -169,7 +171,8 @@ geometry_msgs::msg::TwistStamped PIDController::computeVelocityCommands(
     vel_w = pid_yaw->calculate(0, yaw_error);
     
     if( ((pose.pose.position.x - goal_pose.pose.position.x) > waypoint_radius_error_) && (yaw_error < yaw_threshold_) ) {
-     vel_x = pid_x->calculate(0, pose.pose.position.x - goal_pose.pose.position.x);
+      RCLCPP_INFO(logger_, "Pose is good, FLY!");
+      vel_x = pid_x->calculate(0, pose.pose.position.x - goal_pose.pose.position.x);
     }
 
   }
