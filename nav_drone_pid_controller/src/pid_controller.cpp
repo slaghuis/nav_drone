@@ -142,7 +142,7 @@ geometry_msgs::msg::TwistStamped PIDController::computeVelocityCommands(
   // These variables to be become parameters;
   double yaw_control_limit_ = 1.0;
   double yaw_threshold_ = 0.025;
-  double waypoint_radius_error_ = 0.3;
+  //double waypoint_radius_error_ = 0.3;
   
   
   //  Calculate velocity commands using PID controllers
@@ -170,7 +170,10 @@ geometry_msgs::msg::TwistStamped PIDController::computeVelocityCommands(
     double yaw_error = nav_drone_util::getDiff2Angles(current_yaw, yaw_to_target, PI);
     vel_w = pid_yaw->calculate(0, yaw_error);
     
-    if( (fabs(pose.pose.position.x - goal_pose.pose.position.x) > waypoint_radius_error_) && (fabs(yaw_error) < yaw_threshold_) ) {
+    RCLCPP_INFO(logger_, "Yaw error %.2f, threshold %.2f", nav_drone_util::rad_to_deg(yaw_error), nav_drone_util::rad_to_deg(yaw_threshold_));
+    
+//    if( (fabs(pose.pose.position.x - goal_pose.pose.position.x) > waypoint_radius_error_) && (fabs(yaw_error) < yaw_threshold_) ) {
+    if( fabs(yaw_error) < yaw_threshold_ ) {
       RCLCPP_INFO(logger_, "Pose is good, FLY!");
       vel_x = pid_x->calculate(0, pose.pose.position.x - goal_pose.pose.position.x);
     }
