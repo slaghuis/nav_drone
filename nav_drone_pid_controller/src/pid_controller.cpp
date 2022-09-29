@@ -126,8 +126,7 @@ void PIDController::updateMap(std::shared_ptr<octomap::OcTree> costmap)
 {
   costmap_ = costmap;
 }
-  
-    
+      
 geometry_msgs::msg::TwistStamped PIDController::computeVelocityCommands(
       const geometry_msgs::msg::PoseStamped & pose,
       const geometry_msgs::msg::Twist & speed) 
@@ -136,52 +135,49 @@ geometry_msgs::msg::TwistStamped PIDController::computeVelocityCommands(
   auto goal_pose = getLookAheadPoint(lookahead_dist, pose);
   // Transform the goal_pose to the base_link frame.  Now flight is realtive to the 
   // current position.
-  //geometry_msgs::msg::PoseStamped carrot_pose;
-  //nav_drone_util::transformPoseInTargetFrame(goal_pose, carrot_pose, *tf_, "base_link" );
+  geometry_msgs::msg::PoseStamped carrot_pose;
+  nav_drone_util::transformPoseInTargetFrame(goal_pose, carrot_pose, *tf_, "base_link" );
 
   // These variables to be become parameters;
-  double yaw_control_limit_ = 1.0;
-  double yaw_threshold_ = 0.025;
+  double yaw_control_limit_ = 2.0;
+  double yaw_threshold_ = 0.524;    // 30 degrees
   //double waypoint_radius_error_ = 0.3;
   
-  
   //  Calculate velocity commands using PID controllers
-  double xy_distance = nav_drone_util::euclidean_distance(pose, goal_pose, false);
+  double xy_distance = std::hypot(carrot_pose.pose.position.x, carrot_pose.pose.position.y);   //nav_drone_util::euclidean_distance(pose, goal_pose, false);
   
   double vel_x = 0.0;
   double vel_y = 0.0;
   double vel_z = 0.0;
   double vel_w = 0.0;  // Where w = yaw
   
-  RCLCPP_INFO(logger_, "xy_distance %.2f, current x %.2f, goal x %.2f", xy_distance, pose.pose.position.x, goal_pose.pose.position.x);
+  RCLCPP_INFO(logger_, "xy_distance %.2f, carrot [ %.2f, %.2f] ", xy_distance, carrot_pose.pose.position.x, carrot_pose.pose.position.y);
 
   // If XY is close, use both velocities to fine tune the position
   if (xy_distance < yaw_control_limit_) { 
      RCLCPP_INFO(logger_, "XY is close, fine tune in both dimentions");
-     vel_x = pid_x->calculate(0, pose.pose.position.x - goal_pose.pose.position.x);
-     vel_y = pid_y->calculate(0, pose.pose.position.y - goal_pose.pose.position.y);
+     vel_x = pid_x->calculate(0, carrot_pose.pose.position.x);
+     vel_y = pid_y->calculate(0, carrot_pose.pose.position.y);
   } else {  
-    double yaw_to_target = nav_drone_util::angle(
-      pose.pose.position.x,
-      pose.pose.position.y,
-      goal_pose.pose.position.x,
-      goal_pose.pose.position.y);
-    double current_yaw = nav_drone_util::getYaw(pose);
-    double yaw_error = nav_drone_util::getDiff2Angles(current_yaw, yaw_to_target, PI);
-    vel_w = pid_yaw->calculate(0, yaw_error);
+    double yaw_to_target = nav_drone_util::angle( 0, 0,
+      carrot_pose.pose.position.x, carrot_pose.pose.position.y);
+//    double current_yaw = nav_drone_util::getYaw(pose);
+//    double yaw_error = nav_drone_util::getDiff2Angles(current_yaw, yaw_to_target, PI);
+    vel_w = pid_yaw->calculate(0, yaw_to_target);
     
-    RCLCPP_INFO(logger_, "Yaw error %.2f, threshold %.2f", nav_drone_util::rad_to_deg(yaw_error), nav_drone_util::rad_to_deg(yaw_threshold_));
+    RCLCPP_INFO(logger_, "Yaw error %.2f, threshold %.2f", nav_drone_util::rad_to_deg(yaw_to_target), nav_drone_util::rad_to_deg(yaw_threshold_));
     
 //    if( (fabs(pose.pose.position.x - goal_pose.pose.position.x) > waypoint_radius_error_) && (fabs(yaw_error) < yaw_threshold_) ) {
-    if( fabs(yaw_error) < yaw_threshold_ ) {
+    if( fabs(yaw_to_target) < yaw_threshold_ ) {
       RCLCPP_INFO(logger_, "Pose is good, FLY!");
-      vel_x = pid_x->calculate(0, pose.pose.position.x - goal_pose.pose.position.x);
+      vel_x = pid_x->calculate(0, carrot_pose.pose.position.x);
+      vel_y = pid_y->calculate(0, carrot_pose.pose.position.y);
     }
 
   }
 
   // Calculate Appropriate Z pose.velocity
-  vel_z = pid_z->calculate(0, pose.pose.position.z - goal_pose.pose.position.z);
+  vel_z = pid_z->calculate(0, carrot_pose.pose.position.z);
   
   // Populate the message
   geometry_msgs::msg::TwistStamped setpoint = geometry_msgs::msg::TwistStamped();
