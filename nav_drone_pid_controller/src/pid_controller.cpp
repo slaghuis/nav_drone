@@ -139,8 +139,8 @@ geometry_msgs::msg::TwistStamped PIDController::computeVelocityCommands(
   nav_drone_util::transformPoseInTargetFrame(goal_pose, carrot_pose, *tf_, "base_link" );
 
   // These variables to be become parameters;
-  double yaw_control_limit_ = 2.0;
-  double yaw_threshold_ = 0.524;    // 30 degrees
+  double yaw_control_limit_ = 1.5;
+  double yaw_threshold_ = 0.0872;    // 5 degrees
   //double waypoint_radius_error_ = 0.3;
   
   //  Calculate velocity commands using PID controllers
