@@ -161,11 +161,15 @@ geometry_msgs::msg::TwistStamped PIDController::computeVelocityCommands(
      //vel_y = pid_y->calculate(0, -carrot_pose.pose.position.y);
      vel_w = 0.0;
   } else {  
-    double yaw_to_target = nav_drone_util::angle( 0, 0,
-      carrot_pose.pose.position.x, carrot_pose.pose.position.y);
-//    double current_yaw = nav_drone_util::getYaw(pose);
-//    double yaw_error = nav_drone_util::getDiff2Angles(current_yaw, yaw_to_target, PI);
-    vel_w = pid_yaw->calculate(0, yaw_to_target);
+    double err_x = goal_pose.pose.position.x - pose.pose.position.x;
+    double err_y = goal_pose.pose.position.y - pose.pose.position.y;
+    double yaw_to_target = atan2(err_y , err_x);
+    RCLCPP_INFO(logger_, "error [ %.2f, %.2f] carrot [ %.2f, %.2f] ", err_x, err_y, carrot_pose.pose.position.x, carrot_pose.pose.position.y);
+//    double yaw_to_target = nav_drone_util::angle( 
+//      carrot_pose.pose.position.x, carrot_pose.pose.position.y, 0 ,0);
+    double current_yaw = nav_drone_util::getYaw(pose);
+    double yaw_error = nav_drone_util::getDiff2Angles(yaw_to_target, current_yaw, PI);
+    vel_w = pid_yaw->calculate(0, -yaw_error);
     
     RCLCPP_INFO(logger_, "Yaw error %.2f, threshold %.2f", nav_drone_util::rad_to_deg(yaw_to_target), nav_drone_util::rad_to_deg(yaw_threshold_));
     
