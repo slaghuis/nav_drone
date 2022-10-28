@@ -128,8 +128,8 @@ void PIDController::updateMap(std::shared_ptr<octomap::OcTree> costmap)
 }
       
 geometry_msgs::msg::TwistStamped PIDController::computeVelocityCommands(
-      const geometry_msgs::msg::PoseStamped & pose,
-      const geometry_msgs::msg::Twist & speed) 
+      const geometry_msgs::msg::PoseStamped & pose,    // Current position in map frame
+      const geometry_msgs::msg::Twist & speed)         // Current velocity in FLU orientation
 {
   double lookahead_dist = getLookAheadDistance(speed);
   auto goal_pose = getLookAheadPoint(lookahead_dist, pose);
@@ -145,19 +145,21 @@ geometry_msgs::msg::TwistStamped PIDController::computeVelocityCommands(
   
   //  Calculate velocity commands using PID controllers
   double xy_distance = std::hypot(carrot_pose.pose.position.x, carrot_pose.pose.position.y);   //nav_drone_util::euclidean_distance(pose, goal_pose, false);
-  
+  RCLCPP_INFO(logger_, "xy_distance %.2f, carrot [ %.2f, %.2f] test %2f", xy_distance, carrot_pose.pose.position.x, carrot_pose.pose.position.y, nav_drone_util::euclidean_distance(pose, goal_pose, false));
+
   double vel_x = 0.0;
   double vel_y = 0.0;
   double vel_z = 0.0;
   double vel_w = 0.0;  // Where w = yaw
   
-  RCLCPP_INFO(logger_, "xy_distance %.2f, carrot [ %.2f, %.2f] ", xy_distance, carrot_pose.pose.position.x, carrot_pose.pose.position.y);
-
   // If XY is close, use both velocities to fine tune the position
   if (xy_distance < yaw_control_limit_) { 
      RCLCPP_INFO(logger_, "XY is close, fine tune in both dimentions");
      vel_x = pid_x->calculate(carrot_pose.pose.position.x, 0);
      vel_y = pid_y->calculate(carrot_pose.pose.position.y, 0);
+     //vel_x = pid_x->calculate(0, -carrot_pose.pose.position.x);
+     //vel_y = pid_y->calculate(0, -carrot_pose.pose.position.y);
+     vel_w = 0.0;
   } else {  
     double yaw_to_target = nav_drone_util::angle( 0, 0,
       carrot_pose.pose.position.x, carrot_pose.pose.position.y);
