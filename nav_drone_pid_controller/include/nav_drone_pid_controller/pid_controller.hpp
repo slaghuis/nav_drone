@@ -66,6 +66,8 @@ class PIDController : public nav_drone_core::Controller
     std::shared_ptr<PID> pid_y;
     std::shared_ptr<PID> pid_z;
     std::shared_ptr<PID> pid_yaw;
+    
+    geometry_msgs::msg::TwistStamped previous_setpoint_;
         
     double getLookAheadDistance(const geometry_msgs::msg::Twist & speed);
     std::pair<int, int> get_ez_grid_pos(const octomap:: point3d & goal);

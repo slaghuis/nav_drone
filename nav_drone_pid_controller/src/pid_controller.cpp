@@ -141,6 +141,7 @@ geometry_msgs::msg::TwistStamped PIDController::computeVelocityCommands(
   // These variables to be become parameters;
   double yaw_control_limit_ = 1.5;
   double yaw_threshold_ = 0.0436;    // 2.5 degrees
+  double max_accel_xy_ = 0.2;
   //double waypoint_radius_error_ = 0.3;
   
   //  Calculate velocity commands using PID controllers
@@ -155,32 +156,28 @@ geometry_msgs::msg::TwistStamped PIDController::computeVelocityCommands(
   // If XY is close, use both velocities to fine tune the position
   if (xy_distance < yaw_control_limit_) { 
      RCLCPP_INFO(logger_, "XY is close, fine tune in both dimentions");
-     //vel_x = pid_x->calculate(carrot_pose.pose.position.x, 0);
-     //vel_y = pid_y->calculate(carrot_pose.pose.position.y, 0);
-     vel_x = pid_x->calculate(0, carrot_pose.pose.position.x);
-     vel_y = pid_y->calculate(0, carrot_pose.pose.position.y);
+     vel_x = pid_x->calculate(carrot_pose.pose.position.x, 0);
+     vel_y = pid_y->calculate(carrot_pose.pose.position.y, 0);
      vel_w = 0.0;
   } else {  
     double err_x = goal_pose.pose.position.x - pose.pose.position.x;
     double err_y = goal_pose.pose.position.y - pose.pose.position.y;
     double yaw_to_target = atan2(err_y , err_x);
     RCLCPP_INFO(logger_, "error [ %.2f, %.2f] carrot [ %.2f, %.2f] ", err_x, err_y, carrot_pose.pose.position.x, carrot_pose.pose.position.y);
-//    double yaw_to_target = nav_drone_util::angle( 
-//      carrot_pose.pose.position.x, carrot_pose.pose.position.y, 0 ,0);
+
     double current_yaw = nav_drone_util::getYaw(pose);
     double yaw_error = nav_drone_util::getDiff2Angles(yaw_to_target, current_yaw, PI);
     vel_w = pid_yaw->calculate(0, yaw_error);
     
     RCLCPP_INFO(logger_, "Yaw %.2f, Target %.2f, Yaw error %.2f, threshold %.2f", nav_drone_util::rad_to_deg(current_yaw), nav_drone_util::rad_to_deg(yaw_to_target), nav_drone_util::rad_to_deg(yaw_error), nav_drone_util::rad_to_deg(yaw_threshold_));
     
-//    if( (fabs(pose.pose.position.x - goal_pose.pose.position.x) > waypoint_radius_error_) && (fabs(yaw_error) < yaw_threshold_) ) {
     if( fabs(yaw_error) < yaw_threshold_ ) {
       RCLCPP_INFO(logger_, "Pose is good, FLY!");
-      vel_x = pid_x->calculate(0, carrot_pose.pose.position.x);
-      vel_y = pid_y->calculate(0, carrot_pose.pose.position.y);
+      vel_x = pid_x->calculate(carrot_pose.pose.position.x, 0);
+      vel_y = pid_y->calculate(carrot_pose.pose.position.y, 0);
     }
   }
-
+  
   // Calculate Appropriate Z pose.velocity
   vel_z = pid_z->calculate(carrot_pose.pose.position.z, 0);
   
@@ -193,7 +190,16 @@ geometry_msgs::msg::TwistStamped PIDController::computeVelocityCommands(
   setpoint.twist.linear.y = vel_y;
   setpoint.twist.linear.z = vel_z;
   setpoint.twist.angular.z = vel_w;
-    
+
+  // Govern acceleration 
+  if (setpoint.twist.linear.x > setpoint.twist.linear.x) {     // Accelleration 
+    setpoint.twist.linear.x = min(setpoint.twist.linear.x, previous_setpoint_.twist.linear.x + (max_accel_xy_ / freq_));
+  } else {                                                     // Decelleration  
+    setpoint.twist.linear.x = max(setpoint.twist.linear.x, previous_setpoint_.twist.linear.x - (max_accel_xy_ / freq_));
+  }  
+  
+  previous_setpoint_ = setpoint;    
+  
   return setpoint;
 }
   
