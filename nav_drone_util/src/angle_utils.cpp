@@ -25,7 +25,7 @@ double angle(const double x1, const double y1, const double x2, const double y2)
   if (x2 == x1) 
     return PI / 2;
   
-  return atan( (y2-y1) /(x2-x1));
+  return atan2( (y2-y1), (x2-x1) );
 }
 
 

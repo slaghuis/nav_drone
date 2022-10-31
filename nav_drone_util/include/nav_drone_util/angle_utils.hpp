@@ -25,6 +25,7 @@ const double PI  =3.141592653589793238463;
 namespace nav_drone_util 
 {
 
+/*
 // In C the modulo operation returns a value with the same sign as the dividend.
 // Hence a custom modulo function
 inline double modulo(const double a, const double n) {
@@ -38,6 +39,17 @@ inline double getDiff2Angles(const double x, const double y, const double c)
   double a = x-y;
   return modulo( a+c, 2*c) - c;
 }
+*/  
+
+inline double getDiff2Angles(const double x, const double y, const double c)
+{
+  double d = fabs(fmod(fabs(x-y), 2*c));
+  double r = d > c ? c*2-d : d;
+
+  double sign = ((x-y >= 0.0) && (x-y <= c)) || ((x-y <= c) && (x-y> -2*c)) ? 1.0 : -1.0;
+  return sign * r;
+}
+
 	
 	
 // Calculate the angle between a line defined by two points and the coordinate axes.
