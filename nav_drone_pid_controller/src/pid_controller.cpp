@@ -169,9 +169,9 @@ geometry_msgs::msg::TwistStamped PIDController::computeVelocityCommands(
 //      carrot_pose.pose.position.x, carrot_pose.pose.position.y, 0 ,0);
     double current_yaw = nav_drone_util::getYaw(pose);
     double yaw_error = nav_drone_util::getDiff2Angles(yaw_to_target, current_yaw, PI);
-    vel_w = pid_yaw->calculate(0, -yaw_error);
+    vel_w = pid_yaw->calculate(0, yaw_error);
     
-    RCLCPP_INFO(logger_, "Yaw %.2f, Target %.2f, Yaw error %.2f, threshold %.2f", nav_drone_util::rad_to_deg(current_yaw), nav_drone_util::rad_to_deg(yaw_to_target), nav_drone_util::rad_to_deg(yaw_to_target), nav_drone_util::rad_to_deg(yaw_threshold_));
+    RCLCPP_INFO(logger_, "Yaw %.2f, Target %.2f, Yaw error %.2f, threshold %.2f", nav_drone_util::rad_to_deg(current_yaw), nav_drone_util::rad_to_deg(yaw_to_target), nav_drone_util::rad_to_deg(yaw_error), nav_drone_util::rad_to_deg(yaw_threshold_));
     
 //    if( (fabs(pose.pose.position.x - goal_pose.pose.position.x) > waypoint_radius_error_) && (fabs(yaw_error) < yaw_threshold_) ) {
     if( fabs(yaw_to_target) < yaw_threshold_ ) {
