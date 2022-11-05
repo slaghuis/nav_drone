@@ -87,8 +87,10 @@ public:
   explicit ControllerServer(const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
   : Node("controller_server", options),
     loader_("nav_drone_core", "nav_drone_core::Controller"),
-    default_ids_{"MPCController", "PIDController"},
-    default_types_{"nav_drone_mpc_controller/MPCController", "nav_drone_pid_controller/PIDController"}
+    default_ids_{"PIDController", "RegulatedPurePursuitController"},
+    default_types_{"nav_drone_pid_controller/PIDController", "nav_drone_regulated_pure_pursuit_controller/RegulatedPurePursuitController"}
+//    default_ids_{"MPCController", "PIDController", "PurePursuitController"},
+//    default_types_{"nav_drone_mpc_controller/MPCController", "nav_drone_pid_controller/PIDController", "nav_drone_regulated_pure_pursuit_controller/RegulatedPurePursuitController"}
   {
   
     // Create a transform listener
