@@ -24,6 +24,8 @@
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "nav_msgs/msg/path.hpp"
 #include "nav_drone_util/angle_utils.hpp"
+#include "nav_drone_util/geometry_utils.hpp"
+
 
 namespace nav_drone_util
 {
@@ -70,7 +72,7 @@ double getYaw(const geometry_msgs::msg::PoseStamped & pose) {   return getYaw(po
 double getYaw(const geometry_msgs::msg::Pose & pose) {  return getYaw(pose.orientation); }
   
   
-double calculate_path_length( const nav_msgs::msg::Path path, const size_t current_idx ); 
+//double calculate_path_length( const nav_msgs::msg::Path path, const size_t current_idx ); 
 
 size_t find_closest_goal_idx(const geometry_msgs::msg::PoseStamped pose, const nav_msgs::msg::Path path);  
 

@@ -55,44 +55,6 @@ inline double getDiff2Angles(const double x, const double y, const double c)
 // Calculate the angle between a line defined by two points and the coordinate axes.
 // result is in RADIANS
 double angle(const double x1, const double y1, const double x2, const double y2);
-
-/**
- * @brief Get the L2 distance between 2 geometry_msgs::Poses
- * @param pos1 First pose
- * @param pos1 Second pose
- * @param is_3d True if a true L2 distance is desired (default false)
- * @return double euclidean distance
- */
-inline double euclidean_distance(
-  const geometry_msgs::msg::Pose & pos1,
-  const geometry_msgs::msg::Pose & pos2,
-  const bool is_3d = true)
-{
-  double dx = pos1.position.x - pos2.position.x;
-  double dy = pos1.position.y - pos2.position.y;
-
-  if (is_3d) {
-    double dz = pos1.position.z - pos2.position.z;
-    return std::hypot(dx, dy, dz);
-  }
-
-  return std::hypot(dx, dy);
-}  
-  
-/**
- * @brief Get the L2 distance between 2 geometry_msgs::PoseStamped
- * @param pos1 First pose
- * @param pos1 Second pose
- * @param is_3d True if a true L2 distance is desired (default false)
- * @return double L2 distance
- */
-inline double euclidean_distance(
-  const geometry_msgs::msg::PoseStamped & pos1,
-  const geometry_msgs::msg::PoseStamped & pos2,
-  const bool is_3d = true)
-{
-  return euclidean_distance(pos1.pose, pos2.pose, is_3d);
-}
   
 inline double rad_to_deg(const double rad) { return (rad * 180.0) / PI; }
 inline double deg_to_rad(const double deg) { return (deg * PI) / 180.0; }

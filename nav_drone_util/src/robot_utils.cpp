@@ -113,7 +113,7 @@ bool transformPoseInTargetFrame(
   return false;
 }
 
-  double calculate_path_length( const nav_msgs::msg::Path path, const size_t current_idx ) 
+/*  double calculate_path_length( const nav_msgs::msg::Path path, const size_t current_idx ) 
   {
     double distance = 0.0;
     for(size_t i = current_idx; i < path.poses.size()-1; i++) {
@@ -122,7 +122,7 @@ bool transformPoseInTargetFrame(
     
     return distance;
   }
-  
+*/  
   size_t find_closest_goal_idx(const geometry_msgs::msg::PoseStamped pose, const nav_msgs::msg::Path path)
   {
     size_t closest_pose_idx = 0;

@@ -1,0 +1,5 @@
+<library path="nav_drone_regulated_pure_pursuit_controller">
+  <class name="nav_drone_regulated_pure_pursuit_controller/RegulatedPurePursuitController" type="nav_drone_regulated_pure_pursuit_controller::RegulatedPurePursuitController" base_class_type="nav_drone_core::Controller">
+    <description>Regulated Pure Pursuit Controller</description>
+  </class>
+</library>
