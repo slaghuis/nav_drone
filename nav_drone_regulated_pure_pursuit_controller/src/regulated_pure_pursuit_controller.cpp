@@ -1,4 +1,6 @@
 // Copyright (c) 2022 Eric Slaghuis
+// Copyright (c) 2020 Shrijit Singh
+// Copyright (c) 2020 Samsung Research America
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,8 +15,12 @@
 // limitations under the License.
 
 /* *******************************************************
- * Plugin to the navigation_lite controller server
+ * Plugin to the nav_drone controller server
  * Control algorith: Regulated Pure Pursuit Controller
+ * Adapted from the original work by incorporating 3D flight, 
+ * and the structural anomalies required bythe Nav_Drone 
+ * package, the primary being the OctoMap instead of the costmap.
+ * Leverages a PID controller to adjust altitude.
  * ******************************************************* */
 #include <math.h>     // fabs
 #include <algorithm>  // std::clamp (C++ 17), find_if
@@ -84,7 +90,7 @@ void RegulatedPurePursuitController::configure(const rclcpp::Node::SharedPtr nod
     rclcpp::ParameterValue(true));
   nav_drone_util::declare_parameter_if_not_declared(
     node_, plugin_name_ + ".use_cost_regulated_linear_velocity_scaling",
-    rclcpp::ParameterValue(true));
+    rclcpp::ParameterValue(false));
   nav_drone_util::declare_parameter_if_not_declared(
     node_, plugin_name_ + ".cost_scaling_dist", rclcpp::ParameterValue(0.6));
   nav_drone_util::declare_parameter_if_not_declared(
@@ -209,7 +215,7 @@ void RegulatedPurePursuitController::configure(const rclcpp::Node::SharedPtr nod
   
   rclcpp::Parameter pid_z_settings_param = node_->get_parameter(plugin_name_ + ".pid_z");
   std::vector<double> pid_z_settings = pid_z_settings_param.as_double_array(); 
-  pid_z   = std::make_shared<PID>(control_duration_, desired_linear_vel_, -desired_linear_vel_, (float)pid_z_settings[0], (float)pid_z_settings[1], (float)pid_z_settings[2]);
+  pid_z   = std::make_shared<PID>(control_duration_, desired_linear_vel_, -desired_linear_vel_, (float)pid_z_settings[0], (float)pid_z_settings[2], (float)pid_z_settings[1]);
 }
   
 double RegulatedPurePursuitController::costmapSize()
@@ -237,10 +243,11 @@ double RegulatedPurePursuitController::getLookAheadDistance(
   const geometry_msgs::msg::Twist & speed)
 {
   // If using velocity-scaled look ahead distances, find and clamp the dist
+  // Speed should only be achieved in the x or z dimensions.
   // Else, use the static look ahead distance
   double lookahead_dist = lookahead_dist_;
   if (use_velocity_scaled_lookahead_dist_) {
-    lookahead_dist = fabs(speed.linear.x) * lookahead_time_;
+    lookahead_dist = std::max(fabs(speed.linear.x), fabs(speed.linear.z)) * lookahead_time_;
     lookahead_dist = std::clamp(lookahead_dist, min_lookahead_dist_, max_lookahead_dist_);
   }
 
@@ -255,8 +262,7 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
   geometry_msgs::msg::Pose pose_tolerance;
   geometry_msgs::msg::Twist vel_tolerance;
   // Skip some code here :-)
-  
-  
+   
   // Transform path to robot base frame
   auto transformed_plan = transformGlobalPlan(pose);
 
@@ -276,20 +282,20 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
 
   auto carrot_pose = getLookAheadPoint(lookahead_dist, transformed_plan);
 
-  double linear_vel, angular_vel;
+  double linear_vel, angular_vel, vertical_vel;
 
   // Find distance^2 to look ahead point (carrot) in robot base frame
   // This is the chord length of the circle
   const double carrot_dist2 =
     (carrot_pose.pose.position.x * carrot_pose.pose.position.x) +
     (carrot_pose.pose.position.y * carrot_pose.pose.position.y);
-
+  
   // Find curvature of circle (k = 1 / R)
   double curvature = 0.0;
   if (carrot_dist2 > 0.001) {
     curvature = 2.0 * carrot_pose.pose.position.y / carrot_dist2;
   }
-
+    
   // Setting the velocity direction
   double sign = 1.0;
   if (allow_reversing_) {
@@ -314,18 +320,20 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
     // Apply curvature to angular velocity after constraining linear velocity
     angular_vel = linear_vel * curvature;
   }
+  
+  vertical_vel = pid_z->calculate(carrot_pose.pose.position.z, 0);
 
   // Collision checking on this velocity heading
   //const double & carrot_dist = hypot(carrot_pose.pose.position.x, carrot_pose.pose.position.y);
   //if (use_collision_detection_ && isCollisionImminent(pose, linear_vel, angular_vel, carrot_dist)) {
   //  throw nav2_core::NoValidControl("RegulatedPurePursuitController detected collision ahead!");
   //}
-
+  
   // populate and return message
   geometry_msgs::msg::TwistStamped cmd_vel;
   cmd_vel.header = pose.header;
   cmd_vel.twist.linear.x = linear_vel;
-  cmd_vel.twist.linear.z = pid_z->calculate(carrot_pose.pose.position.z, 0);
+  cmd_vel.twist.linear.z = vertical_vel; 
   cmd_vel.twist.angular.z = angular_vel;
   return cmd_vel;
 }
@@ -361,41 +369,65 @@ void RegulatedPurePursuitController::rotateToHeading(
   angular_vel = std::clamp(angular_vel, min_feasible_angular_speed, max_feasible_angular_speed);
 }
 
-geometry_msgs::msg::Point RegulatedPurePursuitController::circleSegmentIntersection(
+geometry_msgs::msg::Point RegulatedPurePursuitController::sphereSegmentIntersection(
   const geometry_msgs::msg::Point & p1,
   const geometry_msgs::msg::Point & p2,
   double r)
 {
-  // Formula for intersection of a line with a circle centered at the origin,
-  // modified to always return the point that is on the segment between the two points.
-  // https://mathworld.wolfram.com/Circle-LineIntersection.html
-  // This works because the poses are transformed into the robot frame.
-  // This can be derived from solving the system of equations of a line and a circle
-  // which results in something that is just a reformulation of the quadratic formula.
-  // Interactive illustration in doc/circle-segment-intersection.ipynb as well as at
-  // https://www.desmos.com/calculator/td5cwbuocd
-  double x1 = p1.x;
-  double x2 = p2.x;
-  double y1 = p1.y;
-  double y2 = p2.y;
+  // Formula for intersection of a line with a sphere centered at the origin,
+  // modified to allways return the point that is on the segment between the two points.
+  // https://stackoverflow.com/questions/6533856/ray-sphere-intersection
+  
+  //Circle Origin = C(0,0,0)   -- becuse p1 and p2 are transformed to robot frame.
+  double xA = p1.x;
+  double yA = p1.y;
+  double zA = p1.z;
 
-  double dx = x2 - x1;
-  double dy = y2 - y1;
-  double dr2 = dx * dx + dy * dy;
-  double D = x1 * y2 - x2 * y1;
+  double xB = p2.x;
+  double yB = p2.y;
+  double zB = p2.z;
+  
+  //a = (xB-xA)²+(yB-yA)²+(zB-zA)²
+  double a = pow(xB-xA,2) + pow(yB-yA,2) + pow(zB-zA,2); 
+  //b = 2*((xB-xA)(xA-xC)+(yB-yA)(yA-yC)+(zB-zA)(zA-zC))
+  double b = 2 * ((xB-xA)*(xA-0) + (yB-yA)*(yA-0)+(zB-zA)*(zA-0));  
+  //c = (xA-xC)²+(yA-yC)²+(zA-zC)²-r²
+  double c = pow(xA-0,2) + pow(yA-0,2) + pow(zA-0,2) - pow(r,2); 
+  
+  double delta = pow(b,2)-4*a*c;
+  if (delta == 0.0) {
+    double d = -b / 2*a;
+    geometry_msgs::msg::Point p;
+    p.x = xA + d*(xB-xA);
+    p.y = yA + d*(yB-yA);
+    p.z = zA + d*(zB-zA);
+    return p;
+  } 
+  
+  if (delta > 0.0) {
+    double d1 = (-b-sqrt(delta))/(2*a);
+    double d2 = (-b+sqrt(delta))/(2*a);
+  
+    geometry_msgs::msg::Point r1;
+    r1.x = xA + d1*(xB-xA);
+    r1.y = yA + d1*(yB-yA);
+    r1.z = zA + d1*(zB-zA);
 
-  // Augmentation to only return point within segment
-  double d1 = x1 * x1 + y1 * y1;
-  double d2 = x2 * x2 + y2 * y2;
-  double dd = d2 - d1;
-
-  geometry_msgs::msg::Point p;
-  double sqrt_term = std::sqrt(r * r * dr2 - D * D);
-  p.x = (D * dy + std::copysign(1.0, dd) * dx * sqrt_term) / dr2;
-  p.y = (-D * dx + std::copysign(1.0, dd) * dy * sqrt_term) / dr2;
-  return p;
-}
-
+    geometry_msgs::msg::Point r2;
+    r2.x = xA + d2*(xB-xA);
+    r2.y = yA + d2*(yB-yA);
+    r2.z = zA + d2*(zB-zA);
+    
+    if (nav_drone_util::euclidean_distance(r1,p2,true) < nav_drone_util::euclidean_distance(r2,p2,true)) {
+      return r1;
+    } else {
+      return r2;
+    }
+  }
+  
+  throw nav_drone_core::NoValidWaypoint("Line does not intersect sphere");      
+}  
+  
 geometry_msgs::msg::PoseStamped RegulatedPurePursuitController::getLookAheadPoint(
   const double & lookahead_dist,
   const nav_msgs::msg::Path & transformed_plan)
@@ -403,20 +435,20 @@ geometry_msgs::msg::PoseStamped RegulatedPurePursuitController::getLookAheadPoin
   // Find the first pose which is at a distance greater than the lookahead distance
   auto goal_pose_it = std::find_if(
     transformed_plan.poses.begin(), transformed_plan.poses.end(), [&](const auto & ps) {
-      return hypot(ps.pose.position.x, ps.pose.position.y) >= lookahead_dist;
+      return hypot(ps.pose.position.x, ps.pose.position.y, ps.pose.position.z) >= lookahead_dist;
     });
 
-  // If the no pose is not far enough, take the last pose
+  // If the pose is not far enough, take the last pose
   if (goal_pose_it == transformed_plan.poses.end()) {
     goal_pose_it = std::prev(transformed_plan.poses.end());
   } else if (use_interpolation_ && goal_pose_it != transformed_plan.poses.begin()) {
     // Find the point on the line segment between the two poses
     // that is exactly the lookahead distance away from the robot pose (the origin)
-    // This can be found with a closed form for the intersection of a segment and a circle
-    // Because of the way we did the std::find_if, prev_pose is guaranteed to be inside the circle,
-    // and goal_pose is guaranteed to be outside the circle.
-    auto prev_pose_it = std::prev(goal_pose_it);
-    auto point = circleSegmentIntersection(
+    // This can be found with a closed form for the intersection of a segment and a sphere
+    // Because of the way we did the std::find_if, prev_pose is guaranteed to be inside the sphere,
+    // and goal_pose is guaranteed to be outside the sphere.
+    auto prev_pose_it = std::prev(goal_pose_it);    
+    auto point = sphereSegmentIntersection(
       prev_pose_it->pose.position,
       goal_pose_it->pose.position, lookahead_dist);
     geometry_msgs::msg::PoseStamped pose;
@@ -428,18 +460,6 @@ geometry_msgs::msg::PoseStamped RegulatedPurePursuitController::getLookAheadPoin
 
   return *goal_pose_it;
 }
-
-/*
-bool RegulatedPurePursuitController::isCollisionImminent(
-  const geometry_msgs::msg::PoseStamped & robot_pose,
-  const double & linear_vel, const double & angular_vel,
-  const double & carrot_dist)
-
-bool RegulatedPurePursuitController::inCollision(
-  const double & x,
-  const double & y,
-  const double & theta)
-*/
   
 double RegulatedPurePursuitController::costAtPose(const double & x, const double & y, const double & z)
 {
@@ -455,17 +475,6 @@ double RegulatedPurePursuitController::costAtPose(const double & x, const double
   return static_cast<double>(FREE_SPACE);
     
 }
-
-/*
-double RegulatedPurePursuitController::approachVelocityScalingFactor(
-  const nav_msgs::msg::Path & transformed_path
-) const
-
-double RegulatedPurePursuitController::approachVelocityScalingFactor(
-  const nav_msgs::msg::Path & transformed_path
-) const
-*/
-  
 
 void RegulatedPurePursuitController::applyConstraints(
   const double & curvature, const geometry_msgs::msg::Twist & /*curr_speed*/,
@@ -567,7 +576,7 @@ nav_msgs::msg::Path RegulatedPurePursuitController::transformGlobalPlan(
       stamped_pose.header.frame_id = global_plan_.header.frame_id;
       stamped_pose.header.stamp = robot_pose.header.stamp;
       stamped_pose.pose = global_plan_pose.pose;
-      if (!transformPose("base_link", stamped_pose, transformed_pose)) {   // place base_frae id in a parameter
+      if (!transformPose("base_link", stamped_pose, transformed_pose)) {   // place base_frame in a parameter
         throw nav_drone_core::ControllerTFError("Unable to transform plan pose into local frame");
       }
       transformed_pose.pose.position.z = 0.0;

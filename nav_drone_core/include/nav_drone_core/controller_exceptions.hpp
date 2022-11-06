@@ -61,6 +61,13 @@ public:
   explicit NoValidControl(const std::string & description)
   : ControllerException(description) {}
 };
+  
+class NoValidWaypoint : public ControllerException
+{
+public:
+  explicit NoValidWaypoint(const std::string & description)
+  : ControllerException(description) {}
+};  
 
 }  // namespace nav_drone_core
 

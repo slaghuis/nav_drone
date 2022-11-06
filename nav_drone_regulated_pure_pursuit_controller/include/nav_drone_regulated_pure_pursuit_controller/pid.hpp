@@ -18,6 +18,7 @@
 
 #include <iostream>
 #include <cmath>
+#include <algorithm> //std::clamp
 
 using namespace std;
 
@@ -55,10 +56,7 @@ class PID {
       float output = Pout + Iout + Dout;
   
       // Restrict to max/min
-      if (output > _max)
-        output = _max;
-      else if ( output < _min )
-        output = _min;
+      output = std::clamp(output, _min, _max);
     
       _pre_error = error;
       

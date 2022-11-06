@@ -147,20 +147,20 @@ class RegulatedPurePursuitController : public nav_drone_core::Controller
       const double & curvature, const geometry_msgs::msg::Twist & speed,
       const double & pose_cost, const nav_msgs::msg::Path & path,
       double & linear_vel, double & sign);
-
+      
     /**
-     * @brief Find the intersection a circle and a line segment.
+     * @brief Find the intersection a sphere and a line segment.
      * This assumes the circle is centered at the origin.
-     * If no intersection is found, a floating point error will occur.
+     * If no intersection is found, an exceprion will be thrown.
      * @param p1 first endpoint of line segment
      * @param p2 second endpoint of line segment
-     * @param r radius of circle
+     * @param r radius of sphere
      * @return point of intersection
      */
-    static geometry_msgs::msg::Point circleSegmentIntersection(
+     static geometry_msgs::msg::Point sphereSegmentIntersection(
       const geometry_msgs::msg::Point & p1,
       const geometry_msgs::msg::Point & p2,
-      double r);
+      double r);  
 
     /**
      * @brief Get lookahead point
