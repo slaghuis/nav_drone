@@ -22,7 +22,7 @@
  * package, the primary being the OctoMap instead of the costmap.
  * Leverages a PID controller to adjust altitude.
  * ******************************************************* */
-#include <math.h>     // fabs
+#include <math.h>     // fabs, std::max
 #include <algorithm>  // std::clamp (C++ 17), find_if
 #include <string>
 #include <limits>
@@ -31,6 +31,7 @@
 #include <utility>
 
 #include "nav_drone_regulated_pure_pursuit_controller/regulated_pure_pursuit_controller.hpp"
+#include "nav_drone_regulated_pure_pursuit_controller/regulation_functions.hpp"
 #include "nav_drone_core/controller_exceptions.hpp"
 #include "nav_drone_util/node_utils.hpp"
 #include "nav_drone_util/angle_utils.hpp"
@@ -121,11 +122,7 @@ void RegulatedPurePursuitController::configure(const rclcpp::Node::SharedPtr nod
     rclcpp::ParameterValue(true));
   nav_drone_util::declare_parameter_if_not_declared(
     node_, plugin_name_ + ".inscribed_radius", rclcpp::ParameterValue(300.0));
-  nav_drone_util::declare_parameter_if_not_declared(
-    node_, plugin_name_ + ".pid_z",
-    rclcpp::ParameterValue(std::vector<double>{0.7, 0.0, 0.0}));
-  
-  
+    
   node_->get_parameter(plugin_name_ + ".desired_linear_vel", desired_linear_vel_);
   base_desired_linear_vel_ = desired_linear_vel_;
   node_->get_parameter(plugin_name_ + ".lookahead_dist", lookahead_dist_);
@@ -213,9 +210,6 @@ void RegulatedPurePursuitController::configure(const rclcpp::Node::SharedPtr nod
     allow_reversing_ = false;
   }
   
-  rclcpp::Parameter pid_z_settings_param = node_->get_parameter(plugin_name_ + ".pid_z");
-  std::vector<double> pid_z_settings = pid_z_settings_param.as_double_array(); 
-  pid_z   = std::make_shared<PID>(control_duration_, desired_linear_vel_, -desired_linear_vel_, (float)pid_z_settings[0], (float)pid_z_settings[2], (float)pid_z_settings[1]);
 }
   
 double RegulatedPurePursuitController::costmapSize()
@@ -282,7 +276,7 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
 
   auto carrot_pose = getLookAheadPoint(lookahead_dist, transformed_plan);
 
-  double linear_vel, angular_vel, vertical_vel;
+  double linear_vel, angular_vel;
 
   // Find distance^2 to look ahead point (carrot) in robot base frame
   // This is the chord length of the circle
@@ -321,8 +315,21 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
     angular_vel = linear_vel * curvature;
   }
   
-  vertical_vel = pid_z->calculate(carrot_pose.pose.position.z, 0);
-
+  
+  // Scale vertical speed
+  double altitude_error = carrot_pose.pose.position.z - pose.pose.position.z;
+  double velocity_scaling_factor = 1.0;
+  if (std::fabs(altitude_error) < approach_velocity_scaling_dist_) {
+    velocity_scaling_factor = std::fabs(altitude_error) / approach_velocity_scaling_dist_;
+  }  
+  
+  double vertical_vel;
+  if (altitude_error < 0.0) {
+    vertical_vel = -1.0 * desired_linear_vel_ * velocity_scaling_factor;
+  } else {  
+    vertical_vel = desired_linear_vel_ * velocity_scaling_factor;
+  }
+  
   // Collision checking on this velocity heading
   //const double & carrot_dist = hypot(carrot_pose.pose.position.x, carrot_pose.pose.position.y);
   //if (use_collision_detection_ && isCollisionImminent(pose, linear_vel, angular_vel, carrot_dist)) {
@@ -484,10 +491,15 @@ void RegulatedPurePursuitController::applyConstraints(
   double cost_vel = linear_vel;
 
   // limit the linear velocity by curvature
-  const double radius = fabs(1.0 / curvature);
-  const double & min_rad = regulated_linear_scaling_min_radius_;
-  if (use_regulated_linear_velocity_scaling_ && radius < min_rad) {
-    curvature_vel *= 1.0 - (fabs(radius - min_rad) / min_rad);
+  //const double radius = fabs(1.0 / curvature);
+  //const double & min_rad = regulated_linear_scaling_min_radius_;
+  //if (use_regulated_linear_velocity_scaling_ && radius < min_rad) {
+  //  curvature_vel *= 1.0 - (fabs(radius - min_rad) / min_rad);
+ // }
+  // limit the linear velocity by curvature
+  if (use_regulated_linear_velocity_scaling_) {
+    curvature_vel = heuristics::curvatureConstraint(
+      linear_vel, curvature, regulated_linear_scaling_min_radius_);
   }
 
   // limit the linear velocity by proximity to obstacles
@@ -507,7 +519,10 @@ void RegulatedPurePursuitController::applyConstraints(
   linear_vel = std::min(cost_vel, curvature_vel);
   linear_vel = std::max(linear_vel, regulated_linear_scaling_min_speed_);
 
-  applyApproachVelocityScaling(path, linear_vel);
+  // applyApproachVelocityScaling(path, linear_vel);
+  linear_vel = heuristics::approachVelocityConstraint(
+    linear_vel, path, min_approach_linear_velocity_,
+    approach_velocity_scaling_dist_);
 
   // Limit linear velocities to be valid
   linear_vel = std::clamp(fabs(linear_vel), 0.0, desired_linear_vel_);
@@ -662,7 +677,7 @@ double RegulatedPurePursuitController::getCostmapMaxExtent() const
   
 //  const double max_costmap_dim_meters = std::max(
 //    costmap_->getSizeInMetersX(), costmap_->getSizeInMetersY());
-  return max(x,y) / 2.0;
+  return std::max(x,y) / 2.0;
 }  
   
   

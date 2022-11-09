@@ -6,7 +6,7 @@
 #include <algorithm>
 
 #include "nav_drone_core/controller.hpp"
-#include "nav_drone_regulated_pure_pursuit_controller/pid.hpp"
+//#include "nav_drone_regulated_pure_pursuit_controller/pid.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "pluginlib/class_loader.hpp"
 #include "pluginlib/class_list_macros.hpp"
@@ -126,14 +126,14 @@ class RegulatedPurePursuitController : public nav_drone_core::Controller
      */
     double costAtPose(const double & x, const double & y, const double & z);
 
-    double approachVelocityScalingFactor(
-      const nav_msgs::msg::Path & path
-    ) const;
+    //double approachVelocityScalingFactor(
+    //  const nav_msgs::msg::Path & path
+    //) const;
 
-    void applyApproachVelocityScaling(
-      const nav_msgs::msg::Path & path,
-      double & linear_vel
-    ) const;
+    //void applyApproachVelocityScaling(
+    //  const nav_msgs::msg::Path & path,
+    //  double & linear_vel
+    //) const;
 
     /**
      * @brief apply regulation constraints to the system
@@ -193,7 +193,8 @@ class RegulatedPurePursuitController : public nav_drone_core::Controller
   
     nav_msgs::msg::Path global_plan_;
       
-    double desired_linear_vel_, base_desired_linear_vel_;
+    double desired_linear_vel_; 
+    double base_desired_linear_vel_;
     double lookahead_dist_;
     double rotate_to_heading_angular_vel_;
     double max_lookahead_dist_;
@@ -225,12 +226,7 @@ class RegulatedPurePursuitController : public nav_drone_core::Controller
   private:  
     
     double costmapSize();
-    
-    // PID Controllers  
-    std::shared_ptr<PID> pid_z;
-    
-//    geometry_msgs::msg::TwistStamped previous_setpoint_;
-        
+            
 };
   
-}  // namespace  nav_drone_pid_controller
+}  // namespace  nav_drone_regulated_pure_pursuit_controller
