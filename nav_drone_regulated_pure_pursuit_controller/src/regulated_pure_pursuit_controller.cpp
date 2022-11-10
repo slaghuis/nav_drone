@@ -73,6 +73,11 @@ void RegulatedPurePursuitController::configure(const rclcpp::Node::SharedPtr nod
   nav_drone_util::declare_parameter_if_not_declared(
     node_, plugin_name_ + ".rotate_to_heading_angular_vel", rclcpp::ParameterValue(0.5));
   nav_drone_util::declare_parameter_if_not_declared(
+    node, plugin_name_ + ".rotation_velocity_scaling_angle", rclcpp::ParameterValue(0.785));  // 45 degrees
+  nav_drone_util::declare_parameter_if_not_declared(
+    node_, plugin_name_ + ".use_regulated_angular_velocity_scaling",
+    rclcpp::ParameterValue(true));
+  nav_drone_util::declare_parameter_if_not_declared(
     node_, plugin_name_ + ".use_velocity_scaled_lookahead_dist",
     rclcpp::ParameterValue(false));
   nav_drone_util::declare_parameter_if_not_declared(
@@ -178,6 +183,8 @@ void RegulatedPurePursuitController::configure(const rclcpp::Node::SharedPtr nod
   node_->get_parameter(plugin_name_ + ".use_rotate_to_heading", use_rotate_to_heading_);
   node_->get_parameter(plugin_name_ + ".rotate_to_heading_min_angle", rotate_to_heading_min_angle_);
   node_->get_parameter(plugin_name_ + ".max_angular_accel", max_angular_accel_);
+  node_->get_parameter(plugin_name_ + ".rotation_velocity_scaling_angle", rotation_velocity_scaling_angle_);
+  node_->get_parameter(plugin_name_ + ".use_regulated_angular_velocity_scaling", use_regulated_angular_velocity_scaling_);
   node_->get_parameter(plugin_name_ + ".allow_reversing", allow_reversing_);
   node_->get_parameter("controller_frequency", control_frequency);
   node_->get_parameter(
@@ -367,7 +374,13 @@ void RegulatedPurePursuitController::rotateToHeading(
   // Rotate in place using max angular velocity / acceleration possible
   linear_vel = 0.0;
   const double sign = angle_to_path > 0.0 ? 1.0 : -1.0;
-  angular_vel = sign * rotate_to_heading_angular_vel_;
+  
+  double velocity_scaling_factor = 1.0;
+  if (use_regulated_angular_velocity_scaling_ && (std::fabs(angle_to_path) < rotation_velocity_scaling_angle_)) {
+    velocity_scaling_factor = std::fabs(angle_to_path) / rotation_velocity_scaling_angle_;
+  }  
+
+  angular_vel = sign * rotate_to_heading_angular_vel_*velocity_scaling_factor; 
 
   const double & dt = control_duration_;
   const double min_feasible_angular_speed = curr_speed.angular.z - max_angular_accel_ * dt;

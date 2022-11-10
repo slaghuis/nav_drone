@@ -218,6 +218,8 @@ class RegulatedPurePursuitController : public nav_drone_core::Controller
     bool use_rotate_to_heading_;
     double max_angular_accel_;
     double rotate_to_heading_min_angle_;
+    double rotation_velocity_scaling_angle_;  
+    bool use_regulated_angular_velocity_scaling_;
     double goal_dist_tol_;
     bool allow_reversing_;
     double max_robot_pose_search_dist_;
