@@ -71,7 +71,7 @@ void RegulatedPurePursuitController::configure(const rclcpp::Node::SharedPtr nod
   nav_drone_util::declare_parameter_if_not_declared(
     node_, plugin_name_ + ".lookahead_time", rclcpp::ParameterValue(1.5));
   nav_drone_util::declare_parameter_if_not_declared(
-    node_, plugin_name_ + ".rotate_to_heading_angular_vel", rclcpp::ParameterValue(1.8));
+    node_, plugin_name_ + ".rotate_to_heading_angular_vel", rclcpp::ParameterValue(0.5));
   nav_drone_util::declare_parameter_if_not_declared(
     node_, plugin_name_ + ".use_velocity_scaled_lookahead_dist",
     rclcpp::ParameterValue(false));
@@ -315,9 +315,8 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
     angular_vel = linear_vel * curvature;
   }
   
-  
   // Scale vertical speed
-  double altitude_error = carrot_pose.pose.position.z - pose.pose.position.z;
+  double altitude_error = carrot_pose.pose.position.z; // Remember, carrot_pose is in robot base frame  - pose.pose.position.z;
   double velocity_scaling_factor = 1.0;
   if (std::fabs(altitude_error) < approach_velocity_scaling_dist_) {
     velocity_scaling_factor = std::fabs(altitude_error) / approach_velocity_scaling_dist_;
@@ -490,12 +489,6 @@ void RegulatedPurePursuitController::applyConstraints(
   double curvature_vel = linear_vel;
   double cost_vel = linear_vel;
 
-  // limit the linear velocity by curvature
-  //const double radius = fabs(1.0 / curvature);
-  //const double & min_rad = regulated_linear_scaling_min_radius_;
-  //if (use_regulated_linear_velocity_scaling_ && radius < min_rad) {
-  //  curvature_vel *= 1.0 - (fabs(radius - min_rad) / min_rad);
- // }
   // limit the linear velocity by curvature
   if (use_regulated_linear_velocity_scaling_) {
     curvature_vel = heuristics::curvatureConstraint(
