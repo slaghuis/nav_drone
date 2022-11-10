@@ -174,7 +174,7 @@ geometry_msgs::msg::TwistStamped PIDController::computeVelocityCommands(
     if( fabs(yaw_error) < yaw_threshold_ ) {
       RCLCPP_INFO(logger_, "Pose is good, FLY!");
       vel_x = pid_x->calculate(carrot_pose.pose.position.x, 0);
-      vel_y = pid_y->calculate(carrot_pose.pose.position.y, 0);
+      //vel_y = pid_y->calculate(carrot_pose.pose.position.y, 0);
     }
   }
   
