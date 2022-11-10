@@ -63,7 +63,7 @@ void RegulatedPurePursuitController::configure(const rclcpp::Node::SharedPtr nod
   nav_drone_util::declare_parameter_if_not_declared(
     node_, plugin_name_ + ".desired_linear_vel", rclcpp::ParameterValue(0.5));
   nav_drone_util::declare_parameter_if_not_declared(
-    node_, plugin_name_ + ".lookahead_dist", rclcpp::ParameterValue(0.6));
+    node_, plugin_name_ + ".lookahead_dist", rclcpp::ParameterValue(1.6));
   nav_drone_util::declare_parameter_if_not_declared(
     node_, plugin_name_ + ".min_lookahead_dist", rclcpp::ParameterValue(0.3));
   nav_drone_util::declare_parameter_if_not_declared(
@@ -282,7 +282,7 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
   }
 
   auto carrot_pose = getLookAheadPoint(lookahead_dist, transformed_plan);
-  RCLCPP_INFO(logger_, "carrot [ %.2f, %.2f] lookahead_dist %.2f", carrot_pose.pose.position.x, carrot_pose.pose.position.y, lookahead_dist);
+  RCLCPP_INFO(logger_, "carrot [ %.2f, %.2f, %.2f] lookahead_dist %.2f", carrot_pose.pose.position.x, carrot_pose.pose.position.y, carrot_pose.pose.position.z, lookahead_dist);
 
   double linear_vel, angular_vel;
 
@@ -310,14 +310,17 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
   double angle_to_heading;
   if (shouldRotateToGoalHeading(carrot_pose)) {
     double angle_to_goal = nav_drone_util::getYaw(transformed_plan.poses.back().pose.orientation);
+    RCLCPP_INFO(logger_, "Rotating to goal : %.3f", angle_to_goal);
     rotateToHeading(linear_vel, angular_vel, angle_to_goal, speed);
   } else if (shouldRotateToPath(carrot_pose, angle_to_heading)) {
+    RCLCPP_INFO(logger_, "Rotating to heading : %.3f", angle_to_heading);
     rotateToHeading(linear_vel, angular_vel, angle_to_heading, speed);
   } else {
     applyConstraints(
       curvature, speed,
       costAtPose(pose.pose.position.x, pose.pose.position.y, pose.pose.position.z), transformed_plan,
       linear_vel, sign);
+    RCLCPP_INFO(logger_, "Flying");
 
     // Apply curvature to angular velocity after constraining linear velocity
     angular_vel = linear_vel * curvature;
@@ -460,6 +463,7 @@ geometry_msgs::msg::PoseStamped RegulatedPurePursuitController::getLookAheadPoin
 
   // If the pose is not far enough, take the last pose
   if (goal_pose_it == transformed_plan.poses.end()) {
+    RCLCPP_INFO(logger_, "Taking last pose");
     goal_pose_it = std::prev(transformed_plan.poses.end());
   } else if (use_interpolation_ && goal_pose_it != transformed_plan.poses.begin()) {
     // Find the point on the line segment between the two poses
