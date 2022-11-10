@@ -282,6 +282,7 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
   }
 
   auto carrot_pose = getLookAheadPoint(lookahead_dist, transformed_plan);
+  RCLCPP_INFO(logger_, "carrot [ %.2f, %.2f] lookahead_dist %.2f", carrot_pose.pose.position.x, carrot_pose.pose.position.y, lookahead_dist);
 
   double linear_vel, angular_vel;
 
