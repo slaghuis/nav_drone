@@ -567,9 +567,6 @@ nav_msgs::msg::Path RegulatedPurePursuitController::transformGlobalPlan(
     throw nav_drone_core::ControllerTFError("Unable to transform robot pose into global plan's frame");
   }
 
-  // We'll discard points on the plan that are outside the local costmap
-  double max_costmap_extent = getCostmapMaxExtent();
-
   auto closest_pose_upper_bound =
     nav_drone_util::first_after_integrated_distance(
     global_plan_.poses.begin(), global_plan_.poses.end(), max_robot_pose_search_dist_);
@@ -581,43 +578,43 @@ nav_msgs::msg::Path RegulatedPurePursuitController::transformGlobalPlan(
     nav_drone_util::min_by(
     global_plan_.poses.begin(), closest_pose_upper_bound,
     [&robot_pose](const geometry_msgs::msg::PoseStamped & ps) {
-      return nav_drone_util::euclidean_distance(robot_pose, ps);
+      return nav_drone_util::euclidean_distance(robot_pose, ps, true);
     });
-
-  // Find points up to max_transform_dist so we only transform them.
+  
+  // We'll discard points on the plan that are outside the local costmap
+  double max_costmap_extent = getCostmapMaxExtent();
   auto transformation_end = std::find_if(
     transformation_begin, global_plan_.poses.end(),
     [&](const auto & pose) {
-      return nav_drone_util::euclidean_distance(pose, robot_pose) > max_costmap_extent;
+      return nav_drone_util::euclidean_distance(pose, robot_pose, true) > max_costmap_extent;
     });
-
+  
   // Lambda to transform a PoseStamped from global frame to local
   auto transformGlobalPoseToLocal = [&](const auto & global_plan_pose) {
       geometry_msgs::msg::PoseStamped stamped_pose, transformed_pose;
       stamped_pose.header.frame_id = global_plan_.header.frame_id;
       stamped_pose.header.stamp = robot_pose.header.stamp;
       stamped_pose.pose = global_plan_pose.pose;
-      if (!transformPose("base_link", stamped_pose, transformed_pose)) {   // place base_frame in a parameter
+      if (!transformPose("base_link", stamped_pose, transformed_pose)) {
         throw nav_drone_core::ControllerTFError("Unable to transform plan pose into local frame");
       }
-      transformed_pose.pose.position.z = 0.0;
+      //transformed_pose.pose.position.z = 0.0;
       return transformed_pose;
-    };
-
+    }; 
+  
   // Transform the near part of the global plan into the robot's frame of reference.
   nav_msgs::msg::Path transformed_plan;
   std::transform(
     transformation_begin, transformation_end,
     std::back_inserter(transformed_plan.poses),
     transformGlobalPoseToLocal);
-  transformed_plan.header.frame_id = "base_link";  // place this in a parameter  costmap_ros_->getBaseFrameID();
+  transformed_plan.header.frame_id = "base_link";   //costmap_ros_->getBaseFrameID();
   transformed_plan.header.stamp = robot_pose.header.stamp;
 
   // Remove the portion of the global plan that we've already passed so we don't
   // process it on the next iteration (this is called path pruning)
   global_plan_.poses.erase(begin(global_plan_.poses), transformation_begin);
-  //global_path_pub_->publish(transformed_plan);
-
+  
   if (transformed_plan.poses.empty()) {
     throw nav_drone_core::InvalidPath("Resulting plan has 0 poses in it.");
   }
