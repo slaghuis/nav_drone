@@ -573,13 +573,13 @@ nav_msgs::msg::Path RegulatedPurePursuitController::transformGlobalPlan(
     throw nav_drone_core::ControllerTFError("Unable to transform robot pose into global plan's frame");
   }
   
-  auto closest_pose_upper_bound =
+  /*auto closest_pose_upper_bound =
     nav_drone_util::first_after_integrated_distance(
     global_plan_.poses.begin(), global_plan_.poses.end(), max_robot_pose_search_dist_);
-
+  */
   RCLCPP_INFO(logger_, "TGP - plan has %d waypoints and is %.2f long", global_plan_.poses.size(), nav_drone_util::calculate_path_length(global_plan_));  
-  RCLCPP_INFO(logger_, "TGP - closest_pose_upper_bound [%.2f,%.2f] - %.2f", closest_pose_upper_bound->pose.position.x, closest_pose_upper_bound->pose.position.y, max_robot_pose_search_dist_);
-  closest_pose_upper_bound = global_plan_.poses.end();
+  //RCLCPP_INFO(logger_, "TGP - closest_pose_upper_bound [%.2f,%.2f] - %.2f", closest_pose_upper_bound->pose.position.x, closest_pose_upper_bound->pose.position.y, max_robot_pose_search_dist_);
+  auto closest_pose_upper_bound = global_plan_.poses.end();
   RCLCPP_INFO(logger_, "TGP - closest_pose_upper_bound [%.2f,%.2f] - %.2f", closest_pose_upper_bound->pose.position.x, closest_pose_upper_bound->pose.position.y, max_robot_pose_search_dist_);
 
   // First find the closest pose on the path to the robot
