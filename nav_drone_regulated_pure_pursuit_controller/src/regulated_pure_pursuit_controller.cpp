@@ -576,7 +576,9 @@ nav_msgs::msg::Path RegulatedPurePursuitController::transformGlobalPlan(
   auto closest_pose_upper_bound =
     nav_drone_util::first_after_integrated_distance(
     global_plan_.poses.begin(), global_plan_.poses.end(), max_robot_pose_search_dist_);
-
+  
+  RCLCPP_INFO(logger_, "TGP - Closest Pose Upper Bound [x,y]", closest_pose_upper_bound->pose.position.x, closest_pose_upper_bound->pose.position.y);
+  
   // First find the closest pose on the path to the robot
   // bounded by when the path turns around (if it does) so we don't get a pose from a later
   // portion of the path
@@ -586,6 +588,7 @@ nav_msgs::msg::Path RegulatedPurePursuitController::transformGlobalPlan(
     [&robot_pose](const geometry_msgs::msg::PoseStamped & ps) {
       return nav_drone_util::euclidean_distance(robot_pose, ps, true);
     });
+  RCLCPP_INFO(logger_, "TGP - transformation_begin [x,y]", transformation_begin->pose.position.x, transformation_begin->pose.position.y);
   
   // We'll discard points on the plan that are outside the local costmap
   double max_costmap_extent = getCostmapMaxExtent();
@@ -594,6 +597,7 @@ nav_msgs::msg::Path RegulatedPurePursuitController::transformGlobalPlan(
     [&](const auto & pose) {
       return nav_drone_util::euclidean_distance(pose, robot_pose, true) > max_costmap_extent;
     });
+  RCLCPP_INFO(logger_, "TGP - transformation_end [x,y]", transformation_end->pose.position.x, transformation_end->pose.position.y);
   
   // Lambda to transform a PoseStamped from global frame to local
   auto transformGlobalPoseToLocal = [&](const auto & global_plan_pose) {
@@ -604,8 +608,8 @@ nav_msgs::msg::Path RegulatedPurePursuitController::transformGlobalPlan(
       if (!transformPose("base_link", stamped_pose, transformed_pose)) {
         throw nav_drone_core::ControllerTFError("Unable to transform plan pose into local frame");
       }
-       RCLCPP_INFO(logger_, "TGP - Stamped Pose %s [%.2f, %.2f]", stamped_pose.header.frame_id.c_str(), stamped_pose.pose.position.x, stamped_pose.pose.position.x);
-       RCLCPP_INFO(logger_, "TGP - Transfo Pose %s [%.2f, %.2f]", transformed_pose.header.frame_id.c_str(), transformed_pose.pose.position.x, transformed_pose.pose.position.x);
+       RCLCPP_INFO(logger_, "TGP - Stamped Pose %s [%.2f, %.2f]", stamped_pose.header.frame_id.c_str(), stamped_pose.pose.position.x, stamped_pose.pose.position.y);
+       RCLCPP_INFO(logger_, "TGP - Transfo Pose %s [%.2f, %.2f]", transformed_pose.header.frame_id.c_str(), transformed_pose.pose.position.x, transformed_pose.pose.position.y);
       //transformed_pose.pose.position.z = 0.0;
       return transformed_pose;
     }; 
