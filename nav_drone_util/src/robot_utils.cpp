@@ -81,8 +81,13 @@ bool transformPoseInTargetFrame(
   tf2_ros::Buffer & tf_buffer, const std::string target_frame,
   const double transform_timeout)
 {
-  static rclcpp::Logger logger = rclcpp::get_logger("transformPoseInTargetFrame");
+  if (input_pose.header.frame_id == target_frame) {
+    transformed_pose = input_pose;
+    return true;
+  }
 
+  static rclcpp::Logger logger = rclcpp::get_logger("transformPoseInTargetFrame");
+  
   try {
     transformed_pose = tf_buffer.transform(
       input_pose, target_frame,

@@ -65,18 +65,6 @@ class RegulatedPurePursuitController : public nav_drone_core::Controller
       const geometry_msgs::msg::PoseStamped & pose);
 
     /**
-     * @brief Transform a pose to another frame.
-     * @param frame Frame ID to transform to
-     * @param in_pose Pose input to transform
-     * @param out_pose transformed output
-     * @return bool if successful
-     */
-    bool transformPose(
-      const std::string frame,
-      const geometry_msgs::msg::PoseStamped & in_pose,
-      geometry_msgs::msg::PoseStamped & out_pose) const;
-
-    /**
      * @brief Get lookahead distance
      * @param cmd the current speed to use to compute lookahead point
      * @return lookahead distance
@@ -202,7 +190,7 @@ class RegulatedPurePursuitController : public nav_drone_core::Controller
     double lookahead_time_;
     bool use_velocity_scaled_lookahead_dist_;
     double cost_map_size_;
-    tf2::Duration transform_tolerance_;
+    double transform_tolerance_;
     double min_approach_linear_velocity_;
     double approach_velocity_scaling_dist_;
     double control_duration_;

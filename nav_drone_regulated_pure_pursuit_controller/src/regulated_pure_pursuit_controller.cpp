@@ -56,9 +56,8 @@ void RegulatedPurePursuitController::configure(const rclcpp::Node::SharedPtr nod
   logger_ = node_->get_logger();
   clock_ = node->get_clock();
 
-  double transform_tolerance = 0.1;
   double control_frequency = 20.0;
-  goal_dist_tol_ = 0.25;  // reasonable default before first update
+  goal_dist_tol_ = 0.50;  // reasonable default before first update
   
   nav_drone_util::declare_parameter_if_not_declared(
     node_, plugin_name_ + ".desired_linear_vel", rclcpp::ParameterValue(0.5));
@@ -70,6 +69,8 @@ void RegulatedPurePursuitController::configure(const rclcpp::Node::SharedPtr nod
     node_, plugin_name_ + ".max_lookahead_dist", rclcpp::ParameterValue(0.9));
   nav_drone_util::declare_parameter_if_not_declared(
     node_, plugin_name_ + ".lookahead_time", rclcpp::ParameterValue(1.5));
+  nav_drone_util::declare_parameter_if_not_declared(
+    node_, plugin_name_ + ".transform_tolerance", rclcpp::ParameterValue(0.1));
   nav_drone_util::declare_parameter_if_not_declared(
     node_, plugin_name_ + ".rotate_to_heading_angular_vel", rclcpp::ParameterValue(0.5));
   nav_drone_util::declare_parameter_if_not_declared(
@@ -138,7 +139,7 @@ void RegulatedPurePursuitController::configure(const rclcpp::Node::SharedPtr nod
   node_->get_parameter(
     plugin_name_ + ".rotate_to_heading_angular_vel",
     rotate_to_heading_angular_vel_);
-  node_->get_parameter(plugin_name_ + ".transform_tolerance", transform_tolerance);
+  node_->get_parameter(plugin_name_ + ".transform_tolerance", transform_tolerance_);
   node_->get_parameter(
     plugin_name_ + ".use_velocity_scaled_lookahead_dist",
     use_velocity_scaled_lookahead_dist_);
@@ -197,7 +198,6 @@ void RegulatedPurePursuitController::configure(const rclcpp::Node::SharedPtr nod
     plugin_name_ + ".inscribed_radius",
     inscribed_radius_);
 
-  transform_tolerance_ = tf2::durationFromSec(transform_tolerance);
   control_duration_ = 1.0 / control_frequency;
 
   if (inflation_cost_scaling_factor_ <= 0.0) {
@@ -569,19 +569,19 @@ nav_msgs::msg::Path RegulatedPurePursuitController::transformGlobalPlan(
 
   // let's get the pose of the robot in the frame of the plan
   geometry_msgs::msg::PoseStamped robot_pose;
-  if (!transformPose(global_plan_.header.frame_id, pose, robot_pose)) {
+  if (!nav_drone_util::transformPoseInTargetFrame(pose, robot_pose, *tf_, global_plan_.header.frame_id, transform_tolerance_)) {
     throw nav_drone_core::ControllerTFError("Unable to transform robot pose into global plan's frame");
   }
   
-  /*auto closest_pose_upper_bound =
+  auto closest_pose_upper_bound =
     nav_drone_util::first_after_integrated_distance(
     global_plan_.poses.begin(), global_plan_.poses.end(), max_robot_pose_search_dist_);
-  */
-  RCLCPP_INFO(logger_, "TGP - plan has %d waypoints and is %.2f long", global_plan_.poses.size(), nav_drone_util::calculate_path_length(global_plan_));  
-  //RCLCPP_INFO(logger_, "TGP - closest_pose_upper_bound [%.2f,%.2f] - %.2f", closest_pose_upper_bound->pose.position.x, closest_pose_upper_bound->pose.position.y, max_robot_pose_search_dist_);
-  auto closest_pose_upper_bound = global_plan_.poses.end();
-  RCLCPP_INFO(logger_, "TGP - closest_pose_upper_bound [%.2f,%.2f] - %.2f", closest_pose_upper_bound->pose.position.x, closest_pose_upper_bound->pose.position.y, max_robot_pose_search_dist_);
-
+  
+  
+  if (closest_pose_upper_bound == global_plan_.poses.end()) {
+    RCLCPP_INFO(logger_, "Yep, what I thought.  we will transform them all");
+  }
+  
   // First find the closest pose on the path to the robot
   // bounded by when the path turns around (if it does) so we don't get a pose from a later
   // portion of the path
@@ -595,6 +595,9 @@ nav_msgs::msg::Path RegulatedPurePursuitController::transformGlobalPlan(
   
   // We'll discard points on the plan that are outside the local costmap
   double max_costmap_extent = getCostmapMaxExtent();
+  RCLCPP_INFO(logger_, "TGP -  Costmap extent is %.2f", max_costmap_extent);
+  max_costmap_extent = 100.0;
+  
   auto transformation_end = std::find_if(
     transformation_begin, global_plan_.poses.end(),
     [&](const auto & pose) {
@@ -608,7 +611,7 @@ nav_msgs::msg::Path RegulatedPurePursuitController::transformGlobalPlan(
       stamped_pose.header.frame_id = global_plan_.header.frame_id;
       stamped_pose.header.stamp = robot_pose.header.stamp;
       stamped_pose.pose = global_plan_pose.pose;
-      if (!transformPose("base_link", stamped_pose, transformed_pose)) {
+      if (!nav_drone_util::transformPoseInTargetFrame(stamped_pose, transformed_pose, *tf_, "base_link", transform_tolerance_)) {
         throw nav_drone_core::ControllerTFError("Unable to transform plan pose into local frame");
       }
        RCLCPP_INFO(logger_, "TGP - Stamped Pose %s [%.2f, %.2f]", stamped_pose.header.frame_id.c_str(), stamped_pose.pose.position.x, stamped_pose.pose.position.y);
@@ -665,26 +668,6 @@ double RegulatedPurePursuitController::findVelocitySignChange(
   }
 
   return std::numeric_limits<double>::max();
-}
-
-bool RegulatedPurePursuitController::transformPose(
-  const std::string frame,
-  const geometry_msgs::msg::PoseStamped & in_pose,
-  geometry_msgs::msg::PoseStamped & out_pose) const
-{
-  if (in_pose.header.frame_id == frame) {
-    out_pose = in_pose;
-    return true;
-  }
-
-  try {
-    tf_->transform(in_pose, out_pose, frame, transform_tolerance_);
-    out_pose.header.frame_id = frame;
-    return true;
-  } catch (tf2::TransformException & ex) {
-    RCLCPP_ERROR(logger_, "Exception in transformPose: %s", ex.what());
-  }
-  return false;
 }
 
 double RegulatedPurePursuitController::getCostmapMaxExtent() const
