@@ -52,7 +52,8 @@
 #include "nav_drone_util/visibility_control.h"
 #include "nav_drone_util/holddown_timer.hpp"
 #include "nav_drone_core/exceptions.hpp"
-#include <nav_drone_core/controller.hpp>
+#include "nav_drone_core/controller_exceptions.hpp"
+#include "nav_drone_core/controller.hpp"
 
 #include <pluginlib/class_loader.hpp>
 
@@ -253,7 +254,7 @@ void init()
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_subscription_;
 
 // FLIGHT CONTROL ////////////////////////////////////////////////////////////////////////////////////////////////
-  bool stop_movement() 
+  bool publishZeroVelocity() 
   {    
     geometry_msgs::msg::Twist setpoint = geometry_msgs::msg::Twist();
     
@@ -353,7 +354,7 @@ void init()
         if (goal_handle->is_canceling()) {
           goal_handle->canceled(result);
           RCLCPP_INFO(this->get_logger(), "Goal canceled");
-          stop_movement();
+          publishZeroVelocity();
           server_mutex.unlock();
           return;
         }
@@ -387,6 +388,48 @@ void init()
           goal_handle->publish_feedback(feedback);
         } catch (nav_drone_core::DroneException & e) {
           RCLCPP_WARN(this->get_logger(), e.what());
+        } catch (nav_drone_core::ControllerTFError & e) {
+          RCLCPP_ERROR(this->get_logger(), "%s", e.what());
+          publishZeroVelocity();
+          result->error_code = FollowPath::Goal::TF_ERROR;
+          goal_handle->abort(result);
+          server_mutex.unlock();
+          return;
+        } catch (nav_drone_core::NoValidControl & e) {
+          RCLCPP_ERROR(this->get_logger(), "%s", e.what());
+          publishZeroVelocity();
+          result->error_code = FollowPath::Goal::NO_VALID_CONTROL;
+          goal_handle->abort(result);
+          server_mutex.unlock();
+          return;
+        } catch (nav_drone_core::FailedToMakeProgress & e) {
+          RCLCPP_ERROR(this->get_logger(), "%s", e.what());
+          publishZeroVelocity();
+          result->error_code = FollowPath::Goal::FAILED_TO_MAKE_PROGRESS;
+          goal_handle->abort(result);
+          server_mutex.unlock();
+          return;
+        } catch (nav_drone_core::PatienceExceeded & e) {
+          RCLCPP_ERROR(this->get_logger(), "%s", e.what());
+          publishZeroVelocity();
+          result->error_code = FollowPath::Goal::PATIENCE_EXCEEDED;
+          goal_handle->abort(result);
+          server_mutex.unlock();
+          return;
+        } catch (nav_drone_core::InvalidPath & e) {
+          RCLCPP_ERROR(this->get_logger(), "%s", e.what());
+          publishZeroVelocity();
+          result->error_code = FollowPath::Goal::INVALID_PATH;
+          goal_handle->abort(result);
+          server_mutex.unlock();
+          return;
+        } catch (nav_drone_core::ControllerException & e) {
+          RCLCPP_ERROR(this->get_logger(), "%s", e.what());
+          publishZeroVelocity();
+          result->error_code = FollowPath::Goal::UNKNOWN;
+          goal_handle->abort(result);
+          server_mutex.unlock();
+          return;
         }
 
         
@@ -401,11 +444,11 @@ void init()
         }
       }
       
-      stop_movement();      
+      publishZeroVelocity();      
       if (rclcpp::ok() ) { 
         goal_handle->succeed(result);
       }
-      stop_movement();    // Just to make sure.
+      publishZeroVelocity();    // Just to make sure.
     
     }
     catch(pluginlib::PluginlibException& ex)

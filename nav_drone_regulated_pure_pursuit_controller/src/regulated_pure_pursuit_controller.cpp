@@ -572,7 +572,7 @@ nav_msgs::msg::Path RegulatedPurePursuitController::transformGlobalPlan(
   if (!nav_drone_util::transformPoseInTargetFrame(pose, robot_pose, *tf_, global_plan_.header.frame_id, transform_tolerance_)) {
     throw nav_drone_core::ControllerTFError("Unable to transform robot pose into global plan's frame");
   }
-  
+/*  
   auto closest_pose_upper_bound =
     nav_drone_util::first_after_integrated_distance(
     global_plan_.poses.begin(), global_plan_.poses.end(), max_robot_pose_search_dist_);
@@ -604,7 +604,7 @@ nav_msgs::msg::Path RegulatedPurePursuitController::transformGlobalPlan(
       return nav_drone_util::euclidean_distance(pose, robot_pose, true) > max_costmap_extent;
     });
   RCLCPP_INFO(logger_, "TGP - transformation_end [%.2f,%.2f]", transformation_end->pose.position.x, transformation_end->pose.position.y);
-  
+*/  
   // Lambda to transform a PoseStamped from global frame to local
   auto transformGlobalPoseToLocal = [&](const auto & global_plan_pose) {
       geometry_msgs::msg::PoseStamped stamped_pose, transformed_pose;
@@ -623,7 +623,7 @@ nav_msgs::msg::Path RegulatedPurePursuitController::transformGlobalPlan(
   // Transform the near part of the global plan into the robot's frame of reference.
   nav_msgs::msg::Path transformed_plan;
   std::transform(
-    transformation_begin, transformation_end,
+    global_plan_.poses.begin(), global_plan_.poses.end(), //transformation_begin, transformation_end,
     std::back_inserter(transformed_plan.poses),
     transformGlobalPoseToLocal);
   transformed_plan.header.frame_id = "base_link";   //costmap_ros_->getBaseFrameID();
@@ -631,7 +631,7 @@ nav_msgs::msg::Path RegulatedPurePursuitController::transformGlobalPlan(
 
   // Remove the portion of the global plan that we've already passed so we don't
   // process it on the next iteration (this is called path pruning)
-  global_plan_.poses.erase(begin(global_plan_.poses), transformation_begin);
+  //global_plan_.poses.erase(begin(global_plan_.poses), transformation_begin);
   
   if (transformed_plan.poses.empty()) {
     throw nav_drone_core::InvalidPath("Resulting plan has 0 poses in it.");
