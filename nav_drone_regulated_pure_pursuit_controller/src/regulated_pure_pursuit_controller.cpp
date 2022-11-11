@@ -458,6 +458,7 @@ geometry_msgs::msg::PoseStamped RegulatedPurePursuitController::getLookAheadPoin
   // Find the first pose which is at a distance greater than the lookahead distance
   auto goal_pose_it = std::find_if(
     transformed_plan.poses.begin(), transformed_plan.poses.end(), [&](const auto & ps) {
+      RCLCPP_INFO(logger_, "Transfomed point [%.2f,%.2f,%.2f] ", ps.pose.position.x, ps.pose.position.y, ps.pose.position.z);
       return hypot(ps.pose.position.x, ps.pose.position.y, ps.pose.position.z) >= lookahead_dist;
     });
 
@@ -571,7 +572,7 @@ nav_msgs::msg::Path RegulatedPurePursuitController::transformGlobalPlan(
   if (!transformPose(global_plan_.header.frame_id, pose, robot_pose)) {
     throw nav_drone_core::ControllerTFError("Unable to transform robot pose into global plan's frame");
   }
-
+  
   auto closest_pose_upper_bound =
     nav_drone_util::first_after_integrated_distance(
     global_plan_.poses.begin(), global_plan_.poses.end(), max_robot_pose_search_dist_);
@@ -603,6 +604,8 @@ nav_msgs::msg::Path RegulatedPurePursuitController::transformGlobalPlan(
       if (!transformPose("base_link", stamped_pose, transformed_pose)) {
         throw nav_drone_core::ControllerTFError("Unable to transform plan pose into local frame");
       }
+       RCLCPP_INFO(logger_, "TGP - Stamped Pose %s [%.2f, %.2f]", stamped_pose.header.frame_id.c_str(), stamped_pose.pose.position.x, stamped_pose.pose.position.x);
+       RCLCPP_INFO(logger_, "TGP - Transfo Pose %s [%.2f, %.2f]", transformed_pose.header.frame_id.c_str(), transformed_pose.pose.position.x, transformed_pose.pose.position.x);
       //transformed_pose.pose.position.z = 0.0;
       return transformed_pose;
     }; 
