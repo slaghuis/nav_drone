@@ -258,14 +258,14 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
       const geometry_msgs::msg::PoseStamped & pose,    // Current position in map frame
       const geometry_msgs::msg::Twist & speed)         // Current velocity in FLU orientation
 {
+  RCLCPP_INFO(logger_, "Current pos [ %.2f, %.2f, %.2f] frame %s", pose.pose.position.x, pose.pose.position.y, pose.pose.position.z, pose.header.frame_id.c_str() );
   
   // Find look ahead distance and point on path
   double lookahead_dist = getLookAheadDistance(speed);
   auto lookahead_pose = getLookAheadPoint(pose, lookahead_dist);
 
-  //Hack needed during debugging
+  //Hack needed during debugging.  Why is the frame empty?
   RCLCPP_INFO(logger_, "Transforming from [%s]", lookahead_pose.header.frame_id.c_str()); 
-  // lookahead_pose.header.stamp = node_->get_clock()->now();
   lookahead_pose.header.frame_id = "map";
   
   // let's get the lookahead pose in the robot frame
