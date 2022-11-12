@@ -6,11 +6,9 @@
 #include <algorithm>
 
 #include "nav_drone_core/controller.hpp"
-//#include "nav_drone_regulated_pure_pursuit_controller/pid.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "pluginlib/class_loader.hpp"
 #include "pluginlib/class_list_macros.hpp"
-//#include "nav_drone_util/odometry_utils.hpp"
 #include "nav_drone_util/geometry_utils.hpp"
 
 namespace nav_drone_regulated_pure_pursuit_controller
@@ -21,10 +19,7 @@ static constexpr unsigned char LETHAL_OBSTACLE = 254;
 static constexpr unsigned char INSCRIBED_INFLATED_OBSTACLE = 253;
 static constexpr unsigned char MAX_NON_OBSTACLE = 252;
 static constexpr unsigned char FREE_SPACE = 0;  
-  
-  
-static constexpr double NO_SPEED_LIMIT = 0.0;  
-  
+     
 class RegulatedPurePursuitController : public nav_drone_core::Controller
 {
   public:
@@ -43,41 +38,14 @@ class RegulatedPurePursuitController : public nav_drone_core::Controller
     geometry_msgs::msg::TwistStamped computeVelocityCommands(
       const geometry_msgs::msg::PoseStamped & pose,
       const geometry_msgs::msg::Twist & speed) override;   
-      
-    /**
-     * @brief Limits the maximum linear speed of the robot.
-     * @param speed_limit expressed in absolute value (in m/s)
-     * or in percentage from maximum robot speed.
-     * @param percentage Setting speed limit in percentage if true
-     * or in absolute values in false case.
-     */
-    void setSpeedLimit(const double & speed_limit, const bool & percentage); // override;  
-        
-  protected:
-    /**
-     * @brief Transforms global plan into same frame as pose and clips poses ineligible for lookaheadPoint
-     * Points ineligible to be selected as a lookahead point if they are any of the following:
-     * - Outside the local_costmap (collision avoidance cannot be assured)
-     * @param pose pose to transform
-     * @return Path in new frame
-     */
-    nav_msgs::msg::Path transformGlobalPlan(
-      const geometry_msgs::msg::PoseStamped & pose);
 
+  protected:
     /**
      * @brief Get lookahead distance
      * @param cmd the current speed to use to compute lookahead point
      * @return lookahead distance
      */
     double getLookAheadDistance(const geometry_msgs::msg::Twist &);
-
-    /**
-     * @brief Creates a PointStamped message for visualization
-     * @param carrot_pose Input carrot point as a PoseStamped
-     * @return CarrotMsg a carrot point marker, PointStamped
-     */
-    std::unique_ptr<geometry_msgs::msg::PointStamped> createCarrotMsg(
-      const geometry_msgs::msg::PoseStamped & carrot_pose);
 
     /**
      * @brief Whether robot should rotate to rough path heading
@@ -114,56 +82,40 @@ class RegulatedPurePursuitController : public nav_drone_core::Controller
      */
     double costAtPose(const double & x, const double & y, const double & z);
 
-    //double approachVelocityScalingFactor(
-    //  const nav_msgs::msg::Path & path
-    //) const;
+    double approachVelocityScalingFactor(
+      const geometry_msgs::msg::PoseStamped & pose
+    ) const;
 
-    //void applyApproachVelocityScaling(
-    //  const nav_msgs::msg::Path & path,
-    //  double & linear_vel
-    //) const;
+    void applyApproachVelocityScaling(
+      const geometry_msgs::msg::PoseStamped & pose,
+      double & linear_vel
+    ) const;
 
     /**
      * @brief apply regulation constraints to the system
-     * @param linear_vel robot command linear velocity input
      * @param lookahead_dist optimal lookahead distance
      * @param curvature curvature of path
-     * @param speed Speed of robot
      * @param pose_cost cost at this pose
+     * @param pose current pose of the robot
+     * @param linear_vel robot command linear velocity input
+     * @param sign Moving foreward +1 or reversing -1
      */
     void applyConstraints(
-      const double & curvature, const geometry_msgs::msg::Twist & speed,
-      const double & pose_cost, const nav_msgs::msg::Path & path,
+      const double & curvature, 
+      const double & pose_cost, 
+      const geometry_msgs::msg::PoseStamped & pose,
       double & linear_vel, double & sign);
       
     /**
-     * @brief Find the intersection a sphere and a line segment.
-     * This assumes the circle is centered at the origin.
-     * If no intersection is found, an exceprion will be thrown.
-     * @param p1 first endpoint of line segment
-     * @param p2 second endpoint of line segment
-     * @param r radius of sphere
-     * @return point of intersection
-     */
-     static geometry_msgs::msg::Point sphereSegmentIntersection(
-      const geometry_msgs::msg::Point & p1,
-      const geometry_msgs::msg::Point & p2,
-      double r);  
-
-    /**
      * @brief Get lookahead point
+     * @param pose Current position in map frame
      * @param lookahead_dist Optimal lookahead distance
-     * @param path Current global path
      * @return Lookahead point
      */
-    geometry_msgs::msg::PoseStamped getLookAheadPoint(const double &, const nav_msgs::msg::Path &);
+    geometry_msgs::msg::PoseStamped getLookAheadPoint(
+      const geometry_msgs::msg::PoseStamped & pose,
+      const double & lookahead_dist);
 
-    /**
-     * @brief checks for the cusp position
-     * @param pose Pose input to determine the cusp position
-     * @return robot distance from the cusp
-     */
-    double findVelocitySignChange(const nav_msgs::msg::Path & transformed_plan);
 
     /**
      * Get the greatest extent of the costmap in meters from the center.

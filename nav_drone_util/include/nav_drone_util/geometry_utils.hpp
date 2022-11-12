@@ -16,6 +16,9 @@
 #define NAV2_UTIL__GEOMETRY_UTILS_HPP_
 
 #include <cmath>
+#include <stdexcept>
+#include <string>
+#include <memory>
 
 #include "geometry_msgs/msg/pose.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
@@ -28,6 +31,21 @@
 namespace nav_drone_util
 {
 
+class GeometryException : public std::runtime_error
+{
+public:
+  explicit GeometryException(const std::string & description)
+  : std::runtime_error(description) {}
+};
+
+class GeometryBoundsError : public GeometryException
+{
+public:
+  explicit GeometryBoundsError(const std::string & description)
+  : GeometryException(description) {}
+};    
+  
+  
 /**
  * @brief Get a geometry_msgs Quaternion from a yaw angle
  * @param angle Yaw angle to generate a quaternion from
@@ -177,6 +195,72 @@ inline double calculate_path_length(const nav_msgs::msg::Path & path, size_t sta
   }
   return path_length;
 }
+  
+inline geometry_msgs::msg::Point sphereSegmentIntersection(
+  const geometry_msgs::msg::Point & p1,
+  const geometry_msgs::msg::Point & p2,
+  const geometry_msgs::msg::Point & cen,
+  double r)
+{
+  // Formula for intersection of a line with a sphere centered at the origin,
+  // modified to allways return the point that is on the segment between the two points.
+  // If one of the points is not inside the sphere, an exception will be thrown
+  // https://stackoverflow.com/questions/6533856/ray-sphere-intersection
+  
+  double xA = p1.x - cen.x;
+  double yA = p1.y - cen.y;
+  double zA = p1.z - cen.z;
+
+  double xB = p2.x - cen.x;
+  double yB = p2.y - cen.y;
+  double zB = p2.z - cen.z;
+  
+  //a = (xB-xA)²+(yB-yA)²+(zB-zA)²
+  double a = pow(xB-xA,2) + pow(yB-yA,2) + pow(zB-zA,2); 
+  //b = 2*((xB-xA)(xA-xC)+(yB-yA)(yA-yC)+(zB-zA)(zA-zC))
+  double b = 2 * ((xB-xA)*(xA-0) + (yB-yA)*(yA-0)+(zB-zA)*(zA-0));  
+  //c = (xA-xC)²+(yA-yC)²+(zA-zC)²-r²
+  double c = pow(xA-0,2) + pow(yA-0,2) + pow(zA-0,2) - pow(r,2); 
+  
+  double delta = pow(b,2)-4*a*c;
+  if (delta == 0.0) {
+    double d = -b / 2*a;
+    geometry_msgs::msg::Point p;
+    p.x = xA + d*(xB-xA);
+    p.y = yA + d*(yB-yA);
+    p.z = zA + d*(zB-zA);
+    return p;
+  } 
+  
+  if (delta > 0.0) {
+    double d1 = (-b-sqrt(delta))/(2*a);
+    double d2 = (-b+sqrt(delta))/(2*a);
+  
+    geometry_msgs::msg::Point r1;
+    r1.x = xA + d1*(xB-xA);
+    r1.y = yA + d1*(yB-yA);
+    r1.z = zA + d1*(zB-zA);
+
+    geometry_msgs::msg::Point r2;
+    r2.x = xA + d2*(xB-xA);
+    r2.y = yA + d2*(yB-yA);
+    r2.z = zA + d2*(zB-zA);
+    
+    if (nav_drone_util::euclidean_distance(r1,p2,true) < nav_drone_util::euclidean_distance(r2,p2,true)) {
+      r1.x += cen.x;
+      r1.y += cen.y;
+      r1.z += cen.z;      
+      return r1;
+    } else {
+      r2.x += cen.x;
+      r2.y += cen.y;
+      r2.z += cen.z;      
+      return r2;
+    }
+  }
+  
+  throw GeometryBoundsError("Line segment does not intersect sphere");      
+}  
 
 }  // namespace nav_drone_util
 

@@ -31,7 +31,6 @@
 #include <utility>
 
 #include "nav_drone_regulated_pure_pursuit_controller/regulated_pure_pursuit_controller.hpp"
-#include "nav_drone_regulated_pure_pursuit_controller/regulation_functions.hpp"
 #include "nav_drone_core/controller_exceptions.hpp"
 #include "nav_drone_util/node_utils.hpp"
 #include "nav_drone_util/angle_utils.hpp"
@@ -260,28 +259,16 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
       const geometry_msgs::msg::Twist & speed)         // Current velocity in FLU orientation
 {
   
-  geometry_msgs::msg::Pose pose_tolerance;
-  geometry_msgs::msg::Twist vel_tolerance;
-  // Skip some code here :-)
-   
-  // Transform path to robot base frame
-  auto transformed_plan = transformGlobalPlan(pose);
-
   // Find look ahead distance and point on path and publish
   double lookahead_dist = getLookAheadDistance(speed);
 
-  // Check for reverse driving
-  if (allow_reversing_) {
-    // Cusp check
-    double dist_to_cusp = findVelocitySignChange(transformed_plan);
-
-    // if the lookahead distance is further than the cusp, use the cusp distance instead
-    if (dist_to_cusp < lookahead_dist) {
-      lookahead_dist = dist_to_cusp;
-    }
-  }
-
-  auto carrot_pose = getLookAheadPoint(lookahead_dist, transformed_plan);
+  auto lookahead_pose = getLookAheadPoint(pose, lookahead_dist);
+  
+  // let's get the lookahead pose in the robot frame
+  geometry_msgs::msg::PoseStamped carrot_pose;
+  if (!nav_drone_util::transformPoseInTargetFrame(lookahead_pose, carrot_pose, *tf_, "base_link", transform_tolerance_)) {
+    throw nav_drone_core::ControllerTFError("Unable to transform lookahead pose into robot's frame");
+  }  
   RCLCPP_INFO(logger_, "carrot [ %.2f, %.2f, %.2f] lookahead_dist %.2f", carrot_pose.pose.position.x, carrot_pose.pose.position.y, carrot_pose.pose.position.z, lookahead_dist);
 
   double linear_vel, angular_vel;
@@ -309,7 +296,12 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
   // Make sure we're in compliance with basic constraints
   double angle_to_heading;
   if (shouldRotateToGoalHeading(carrot_pose)) {
-    double angle_to_goal = nav_drone_util::getYaw(transformed_plan.poses.back().pose.orientation);
+    geometry_msgs::msg::PoseStamped goal_pose;
+    if (!nav_drone_util::transformPoseInTargetFrame(global_plan_.poses.back(), goal_pose, *tf_, "base_link", transform_tolerance_)) {
+      throw nav_drone_core::ControllerTFError("Unable to transform goal pose into robot's frame");
+    }      
+    // Should I not calculate the yaw to the goal, instead of the yaw of the goal??????
+    double angle_to_goal = nav_drone_util::getYaw(goal_pose);
     RCLCPP_INFO(logger_, "Rotating to goal : %.3f", angle_to_goal);
     rotateToHeading(linear_vel, angular_vel, angle_to_goal, speed);
   } else if (shouldRotateToPath(carrot_pose, angle_to_heading)) {
@@ -317,8 +309,9 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
     rotateToHeading(linear_vel, angular_vel, angle_to_heading, speed);
   } else {
     applyConstraints(
-      curvature, speed,
-      costAtPose(pose.pose.position.x, pose.pose.position.y, pose.pose.position.z), transformed_plan,
+      curvature,
+      costAtPose(pose.pose.position.x, pose.pose.position.y, pose.pose.position.z), 
+      pose, 
       linear_vel, sign);
     RCLCPP_INFO(logger_, "Flying");
 
@@ -391,101 +384,38 @@ void RegulatedPurePursuitController::rotateToHeading(
   const double max_feasible_angular_speed = curr_speed.angular.z + max_angular_accel_ * dt;
   angular_vel = std::clamp(angular_vel, min_feasible_angular_speed, max_feasible_angular_speed);
 }
-
-geometry_msgs::msg::Point RegulatedPurePursuitController::sphereSegmentIntersection(
-  const geometry_msgs::msg::Point & p1,
-  const geometry_msgs::msg::Point & p2,
-  double r)
-{
-  // Formula for intersection of a line with a sphere centered at the origin,
-  // modified to allways return the point that is on the segment between the two points.
-  // https://stackoverflow.com/questions/6533856/ray-sphere-intersection
-  
-  //Circle Origin = C(0,0,0)   -- becuse p1 and p2 are transformed to robot frame.
-  double xA = p1.x;
-  double yA = p1.y;
-  double zA = p1.z;
-
-  double xB = p2.x;
-  double yB = p2.y;
-  double zB = p2.z;
-  
-  //a = (xB-xA)²+(yB-yA)²+(zB-zA)²
-  double a = pow(xB-xA,2) + pow(yB-yA,2) + pow(zB-zA,2); 
-  //b = 2*((xB-xA)(xA-xC)+(yB-yA)(yA-yC)+(zB-zA)(zA-zC))
-  double b = 2 * ((xB-xA)*(xA-0) + (yB-yA)*(yA-0)+(zB-zA)*(zA-0));  
-  //c = (xA-xC)²+(yA-yC)²+(zA-zC)²-r²
-  double c = pow(xA-0,2) + pow(yA-0,2) + pow(zA-0,2) - pow(r,2); 
-  
-  double delta = pow(b,2)-4*a*c;
-  if (delta == 0.0) {
-    double d = -b / 2*a;
-    geometry_msgs::msg::Point p;
-    p.x = xA + d*(xB-xA);
-    p.y = yA + d*(yB-yA);
-    p.z = zA + d*(zB-zA);
-    return p;
-  } 
-  
-  if (delta > 0.0) {
-    double d1 = (-b-sqrt(delta))/(2*a);
-    double d2 = (-b+sqrt(delta))/(2*a);
-  
-    geometry_msgs::msg::Point r1;
-    r1.x = xA + d1*(xB-xA);
-    r1.y = yA + d1*(yB-yA);
-    r1.z = zA + d1*(zB-zA);
-
-    geometry_msgs::msg::Point r2;
-    r2.x = xA + d2*(xB-xA);
-    r2.y = yA + d2*(yB-yA);
-    r2.z = zA + d2*(zB-zA);
-    
-    if (nav_drone_util::euclidean_distance(r1,p2,true) < nav_drone_util::euclidean_distance(r2,p2,true)) {
-      return r1;
-    } else {
-      return r2;
-    }
-  }
-  
-  throw nav_drone_core::NoValidWaypoint("Line does not intersect sphere");      
-}  
   
 geometry_msgs::msg::PoseStamped RegulatedPurePursuitController::getLookAheadPoint(
-  const double & lookahead_dist,
-  const nav_msgs::msg::Path & transformed_plan)
-{
+  const geometry_msgs::msg::PoseStamped & pose,  // Current position in map frame
+  const double & lookahead_dist)                       // Distance in meters
+{ 
   // Find the first pose which is at a distance greater than the lookahead distance
   auto goal_pose_it = std::find_if(
-    transformed_plan.poses.begin(), transformed_plan.poses.end(), [&](const auto & ps) {
-      RCLCPP_INFO(logger_, "Transfomed point [%.2f,%.2f,%.2f] ", ps.pose.position.x, ps.pose.position.y, ps.pose.position.z);
-      return hypot(ps.pose.position.x, ps.pose.position.y, ps.pose.position.z) >= lookahead_dist;
+    global_plan_.poses.begin(), global_plan_.poses.end(), [&](const auto & ps) {
+      return nav_drone_util::euclidean_distance(pose, ps, true) >= lookahead_dist;
     });
 
   // If the pose is not far enough, take the last pose
-  if (goal_pose_it == transformed_plan.poses.end()) {
-    RCLCPP_INFO(logger_, "Taking last pose");
-    goal_pose_it = std::prev(transformed_plan.poses.end());
-  } else if (use_interpolation_ && goal_pose_it != transformed_plan.poses.begin()) {
-    // Find the point on the line segment between the two poses
-    // that is exactly the lookahead distance away from the robot pose (the origin)
+  if (goal_pose_it == global_plan_.poses.end()) {
+    goal_pose_it = std::prev(global_plan_.poses.end());
+    // lookahead_dist = nav_drone_util::euclidean_distance(pose, *goal_pose_it, true);
+  } else if (use_interpolation_) {
+    // Find the point on the line segment between the current pose and the found point
+    // that is exactly the lookahead distance away from the robot pose
     // This can be found with a closed form for the intersection of a segment and a sphere
-    // Because of the way we did the std::find_if, prev_pose is guaranteed to be inside the sphere,
-    // and goal_pose is guaranteed to be outside the sphere.
-    auto prev_pose_it = std::prev(goal_pose_it);    
-    auto point = sphereSegmentIntersection(
-      prev_pose_it->pose.position,
-      goal_pose_it->pose.position, lookahead_dist);
+    auto point = nav_drone_util::sphereSegmentIntersection(
+      pose.pose.position,
+      goal_pose_it->pose.position, pose.pose.position, lookahead_dist);
     geometry_msgs::msg::PoseStamped pose;
-    pose.header.frame_id = prev_pose_it->header.frame_id;
-    pose.header.stamp = goal_pose_it->header.stamp;
+    pose.header.frame_id = pose.header.frame_id;
+    pose.header.stamp = pose.header.stamp;
     pose.pose.position = point;
     return pose;
   }
 
-  return *goal_pose_it;
-}
-  
+  return *goal_pose_it;  
+} 
+    
 double RegulatedPurePursuitController::costAtPose(const double & x, const double & y, const double & z)
 {
   
@@ -500,18 +430,53 @@ double RegulatedPurePursuitController::costAtPose(const double & x, const double
   return static_cast<double>(FREE_SPACE);
     
 }
+  
+double RegulatedPurePursuitController::approachVelocityScalingFactor(const geometry_msgs::msg::PoseStamped & pose) const
+{
+  // Waiting to apply the threshold based on integrated distance ensures we don't
+  // erroneously apply approach scaling on curvy paths that are contained in a large local costmap.
+  double remaining_distance = nav_drone_util::calculate_path_length(global_plan_);
+  if (remaining_distance < approach_velocity_scaling_dist_) {
+    auto & last = global_plan_.poses.back();
+    // Here we will use a regular euclidean distance from the robot frame (origin)
+    // to get smooth scaling, regardless of path density.    
+    double distance_to_last_pose = nav_drone_util::euclidean_distance(pose, last, true);
+    return distance_to_last_pose / approach_velocity_scaling_dist_;
+  } else {
+    return 1.0;
+  }
+}
+
+void RegulatedPurePursuitController::applyApproachVelocityScaling(
+  const geometry_msgs::msg::PoseStamped & pose,
+  double & linear_vel
+) const
+{
+  double approach_vel = linear_vel;
+  double velocity_scaling = approachVelocityScalingFactor(pose);
+  double unbounded_vel = approach_vel * velocity_scaling;
+  if (unbounded_vel < min_approach_linear_velocity_) {
+    approach_vel = min_approach_linear_velocity_;
+  } else {
+    approach_vel *= velocity_scaling;
+  }
+
+  // Use the lowest velocity between approach and other constraints, if all overlapping
+  linear_vel = std::min(linear_vel, approach_vel);
+}  
 
 void RegulatedPurePursuitController::applyConstraints(
-  const double & curvature, const geometry_msgs::msg::Twist & /*curr_speed*/,
-  const double & pose_cost, const nav_msgs::msg::Path & path, double & linear_vel, double & sign)
+  const double & curvature,  const double & pose_cost, 
+  const geometry_msgs::msg::PoseStamped & pose, double & linear_vel, double & sign)
 {
   double curvature_vel = linear_vel;
   double cost_vel = linear_vel;
 
   // limit the linear velocity by curvature
-  if (use_regulated_linear_velocity_scaling_) {
-    curvature_vel = heuristics::curvatureConstraint(
-      linear_vel, curvature, regulated_linear_scaling_min_radius_);
+  const double radius = fabs(1.0 / curvature);
+  const double & min_rad = regulated_linear_scaling_min_radius_;
+  if (use_regulated_linear_velocity_scaling_ && radius < min_rad) {
+    curvature_vel *= 1.0 - (fabs(radius - min_rad) / min_rad);
   }
 
   // limit the linear velocity by proximity to obstacles
@@ -531,143 +496,11 @@ void RegulatedPurePursuitController::applyConstraints(
   linear_vel = std::min(cost_vel, curvature_vel);
   linear_vel = std::max(linear_vel, regulated_linear_scaling_min_speed_);
 
-  // applyApproachVelocityScaling(path, linear_vel);
-  linear_vel = heuristics::approachVelocityConstraint(
-    linear_vel, path, min_approach_linear_velocity_,
-    approach_velocity_scaling_dist_);
-
+  applyApproachVelocityScaling(pose, linear_vel);
+  
   // Limit linear velocities to be valid
   linear_vel = std::clamp(fabs(linear_vel), 0.0, desired_linear_vel_);
   linear_vel = sign * linear_vel;
-}
-
-void RegulatedPurePursuitController::setSpeedLimit(
-  const double & speed_limit,
-  const bool & percentage)
-{
-//  if (speed_limit == nav2_costmap_2d::NO_SPEED_LIMIT) {
-  if (speed_limit == NO_SPEED_LIMIT) {
-    // Restore default value
-    desired_linear_vel_ = base_desired_linear_vel_;
-  } else {
-    if (percentage) {
-      // Speed limit is expressed in % from maximum speed of robot
-      desired_linear_vel_ = base_desired_linear_vel_ * speed_limit / 100.0;
-    } else {
-      // Speed limit is expressed in absolute value
-      desired_linear_vel_ = speed_limit;
-    }
-  }
-}
-
-nav_msgs::msg::Path RegulatedPurePursuitController::transformGlobalPlan(
-  const geometry_msgs::msg::PoseStamped & pose)
-{
-  if (global_plan_.poses.empty()) {
-    throw nav_drone_core::InvalidPath("Received plan with zero length");
-  }
-
-  // let's get the pose of the robot in the frame of the plan
-  geometry_msgs::msg::PoseStamped robot_pose;
-  if (!nav_drone_util::transformPoseInTargetFrame(pose, robot_pose, *tf_, global_plan_.header.frame_id, transform_tolerance_)) {
-    throw nav_drone_core::ControllerTFError("Unable to transform robot pose into global plan's frame");
-  }
-/*  
-  auto closest_pose_upper_bound =
-    nav_drone_util::first_after_integrated_distance(
-    global_plan_.poses.begin(), global_plan_.poses.end(), max_robot_pose_search_dist_);
-  
-  
-  if (closest_pose_upper_bound == global_plan_.poses.end()) {
-    RCLCPP_INFO(logger_, "Yep, what I thought.  we will transform them all");
-  }
-  
-  // First find the closest pose on the path to the robot
-  // bounded by when the path turns around (if it does) so we don't get a pose from a later
-  // portion of the path
-  auto transformation_begin = 
-    nav_drone_util::min_by(
-    global_plan_.poses.begin(), closest_pose_upper_bound,
-    [&robot_pose](const geometry_msgs::msg::PoseStamped & ps) {
-      return nav_drone_util::euclidean_distance(robot_pose, ps, true);
-    });
-  RCLCPP_INFO(logger_, "TGP - transformation_begin [%.2f,%.2f]", transformation_begin->pose.position.x, transformation_begin->pose.position.y);
-  
-  // We'll discard points on the plan that are outside the local costmap
-  double max_costmap_extent = getCostmapMaxExtent();
-  RCLCPP_INFO(logger_, "TGP -  Costmap extent is %.2f", max_costmap_extent);
-  max_costmap_extent = 100.0;
-  
-  auto transformation_end = std::find_if(
-    transformation_begin, global_plan_.poses.end(),
-    [&](const auto & pose) {
-      return nav_drone_util::euclidean_distance(pose, robot_pose, true) > max_costmap_extent;
-    });
-  RCLCPP_INFO(logger_, "TGP - transformation_end [%.2f,%.2f]", transformation_end->pose.position.x, transformation_end->pose.position.y);
-*/  
-  // Lambda to transform a PoseStamped from global frame to local
-  auto transformGlobalPoseToLocal = [&](const auto & global_plan_pose) {
-      geometry_msgs::msg::PoseStamped stamped_pose, transformed_pose;
-      stamped_pose.header.frame_id = global_plan_.header.frame_id;
-      stamped_pose.header.stamp = robot_pose.header.stamp;
-      stamped_pose.pose = global_plan_pose.pose;
-      if (!nav_drone_util::transformPoseInTargetFrame(stamped_pose, transformed_pose, *tf_, "base_link", transform_tolerance_)) {
-        throw nav_drone_core::ControllerTFError("Unable to transform plan pose into local frame");
-      }
-       RCLCPP_INFO(logger_, "TGP - Stamped Pose %s [%.2f, %.2f]", stamped_pose.header.frame_id.c_str(), stamped_pose.pose.position.x, stamped_pose.pose.position.y);
-       RCLCPP_INFO(logger_, "TGP - Transfo Pose %s [%.2f, %.2f]", transformed_pose.header.frame_id.c_str(), transformed_pose.pose.position.x, transformed_pose.pose.position.y);
-      //transformed_pose.pose.position.z = 0.0;
-      return transformed_pose;
-    }; 
-  
-  // Transform the near part of the global plan into the robot's frame of reference.
-  nav_msgs::msg::Path transformed_plan;
-  std::transform(
-    global_plan_.poses.begin(), global_plan_.poses.end(), //transformation_begin, transformation_end,
-    std::back_inserter(transformed_plan.poses),
-    transformGlobalPoseToLocal);
-  transformed_plan.header.frame_id = "base_link";   //costmap_ros_->getBaseFrameID();
-  transformed_plan.header.stamp = robot_pose.header.stamp;
-
-  // Remove the portion of the global plan that we've already passed so we don't
-  // process it on the next iteration (this is called path pruning)
-  //global_plan_.poses.erase(begin(global_plan_.poses), transformation_begin);
-  
-  if (transformed_plan.poses.empty()) {
-    throw nav_drone_core::InvalidPath("Resulting plan has 0 poses in it.");
-  }
-
-  return transformed_plan;
-}
-
-double RegulatedPurePursuitController::findVelocitySignChange(
-  const nav_msgs::msg::Path & transformed_plan)
-{
-  // Iterating through the transformed global path to determine the position of the cusp
-  for (unsigned int pose_id = 1; pose_id < transformed_plan.poses.size() - 1; ++pose_id) {
-    // We have two vectors for the dot product OA and AB. Determining the vectors.
-    double oa_x = transformed_plan.poses[pose_id].pose.position.x -
-      transformed_plan.poses[pose_id - 1].pose.position.x;
-    double oa_y = transformed_plan.poses[pose_id].pose.position.y -
-      transformed_plan.poses[pose_id - 1].pose.position.y;
-    double ab_x = transformed_plan.poses[pose_id + 1].pose.position.x -
-      transformed_plan.poses[pose_id].pose.position.x;
-    double ab_y = transformed_plan.poses[pose_id + 1].pose.position.y -
-      transformed_plan.poses[pose_id].pose.position.y;
-
-    /* Checking for the existance of cusp, in the path, using the dot product
-    and determine it's distance from the robot. If there is no cusp in the path,
-    then just determine the distance to the goal location. */
-    if ( (oa_x * ab_x) + (oa_y * ab_y) < 0.0) {
-      // returning the distance if there is a cusp
-      // The transformed path is in the robots frame, so robot is at the origin
-      return hypot(
-        transformed_plan.poses[pose_id].pose.position.x,
-        transformed_plan.poses[pose_id].pose.position.y);
-    }
-  }
-
-  return std::numeric_limits<double>::max();
 }
 
 double RegulatedPurePursuitController::getCostmapMaxExtent() const

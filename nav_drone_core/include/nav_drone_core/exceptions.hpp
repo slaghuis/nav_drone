@@ -38,7 +38,6 @@
 
 #include <stdexcept>
 #include <string>
-#include <memory>
 
 namespace nav_drone_core
 {
@@ -50,5 +49,7 @@ public:
   : std::runtime_error(description) {}
   using Ptr = std::shared_ptr<DroneException>;
 };
+      
+
 
 }  // namespace nav_drone_core
