@@ -12,8 +12,7 @@
 #include "nav_drone_util/geometry_utils.hpp"
 
 namespace nav_drone_regulated_pure_pursuit_controller
-{
-  
+{  
 static constexpr unsigned char NO_INFORMATION = 255;
 static constexpr unsigned char LETHAL_OBSTACLE = 254;
 static constexpr unsigned char INSCRIBED_INFLATED_OBSTACLE = 253;

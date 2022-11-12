@@ -263,6 +263,11 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
   double lookahead_dist = getLookAheadDistance(speed);
 
   auto lookahead_pose = getLookAheadPoint(pose, lookahead_dist);
+  RCLCPP_INFO(logger_, "Transforming from [%s]", lookahead_pose.header.frame_id); 
+
+  //Hack 
+  lookahead_pose.header.stamp = node_->get_clock()->now();
+  lookahead_pose.header.frame_id = "map";
   
   // let's get the lookahead pose in the robot frame
   geometry_msgs::msg::PoseStamped carrot_pose;
