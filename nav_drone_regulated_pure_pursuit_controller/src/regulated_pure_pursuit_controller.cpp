@@ -259,14 +259,13 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
       const geometry_msgs::msg::Twist & speed)         // Current velocity in FLU orientation
 {
   
-  // Find look ahead distance and point on path and publish
+  // Find look ahead distance and point on path
   double lookahead_dist = getLookAheadDistance(speed);
-
   auto lookahead_pose = getLookAheadPoint(pose, lookahead_dist);
-  RCLCPP_INFO(logger_, "Transforming from [%s]", lookahead_pose.header.frame_id); 
 
-  //Hack 
-  lookahead_pose.header.stamp = node_->get_clock()->now();
+  //Hack needed during debugging
+  RCLCPP_INFO(logger_, "Transforming from [%s]", lookahead_pose.header.frame_id.c_str()); 
+  // lookahead_pose.header.stamp = node_->get_clock()->now();
   lookahead_pose.header.frame_id = "map";
   
   // let's get the lookahead pose in the robot frame
