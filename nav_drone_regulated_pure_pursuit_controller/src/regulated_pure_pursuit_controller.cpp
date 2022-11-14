@@ -258,16 +258,15 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
       const geometry_msgs::msg::PoseStamped & pose,    // Current position in map frame
       const geometry_msgs::msg::Twist & speed)         // Current velocity in FLU orientation
 {
-  RCLCPP_INFO(logger_, "Current pos [ %.2f, %.2f, %.2f] frame %s", pose.pose.position.x, pose.pose.position.y, pose.pose.position.z, pose.header.frame_id.c_str() );
+  RCLCPP_INFO(logger_, "Current pos [ %.2f, %.2f, %.2f] Yaw [%.2f] frame %s", 
+              pose.pose.position.x, pose.pose.position.y, pose.pose.position.z,
+              nav_drone_util::getYaw(pose.pose.orientation),
+              pose.header.frame_id.c_str() );
   
   // Find look ahead distance and point on path
   double lookahead_dist = getLookAheadDistance(speed);
   auto lookahead_pose = getLookAheadPoint(pose, lookahead_dist);
 
-  //Hack needed during debugging.  Why is the frame empty?
-  RCLCPP_INFO(logger_, "Transforming from [%s]", lookahead_pose.header.frame_id.c_str()); 
-  lookahead_pose.header.frame_id = "map";
-  
   // let's get the lookahead pose in the robot frame
   geometry_msgs::msg::PoseStamped carrot_pose;
   if (!nav_drone_util::transformPoseInTargetFrame(lookahead_pose, carrot_pose, *tf_, "base_link", transform_tolerance_)) {
@@ -324,18 +323,14 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
   }
   
   // Scale vertical speed
-  double altitude_error = carrot_pose.pose.position.z; // Remember, carrot_pose is in robot base frame  - pose.pose.position.z;
-  double velocity_scaling_factor = 1.0;
+  double altitude_error = carrot_pose.pose.position.z;
+  double velocity_scaling_factor;  
   if (std::fabs(altitude_error) < approach_velocity_scaling_dist_) {
-    velocity_scaling_factor = std::fabs(altitude_error) / approach_velocity_scaling_dist_;
-  }  
-  
-  double vertical_vel;
-  if (altitude_error < 0.0) {
-    vertical_vel = -1.0 * desired_linear_vel_ * velocity_scaling_factor;
-  } else {  
-    vertical_vel = desired_linear_vel_ * velocity_scaling_factor;
+    velocity_scaling_factor = altitude_error / approach_velocity_scaling_dist_;
+  } else {
+    velocity_scaling_factor = altitude_error / std::fabs(altitude_error);
   }
+  double vertical_vel = desired_linear_vel_ * velocity_scaling_factor;
   
   // Collision checking on this velocity heading
   //const double & carrot_dist = hypot(carrot_pose.pose.position.x, carrot_pose.pose.position.y);
@@ -410,11 +405,11 @@ geometry_msgs::msg::PoseStamped RegulatedPurePursuitController::getLookAheadPoin
     auto point = nav_drone_util::sphereSegmentIntersection(
       pose.pose.position,
       goal_pose_it->pose.position, pose.pose.position, lookahead_dist);
-    geometry_msgs::msg::PoseStamped pose;
-    pose.header.frame_id = pose.header.frame_id;
-    pose.header.stamp = pose.header.stamp;
-    pose.pose.position = point;
-    return pose;
+    geometry_msgs::msg::PoseStamped interpreted_pose;
+    interpreted_pose.header.frame_id = pose.header.frame_id;
+    interpreted_pose.header.stamp = pose.header.stamp;
+    interpreted_pose.pose.position = point;
+    return interpreted_pose;
   }
 
   return *goal_pose_it;  
