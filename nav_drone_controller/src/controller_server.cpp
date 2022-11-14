@@ -142,7 +142,6 @@ protected:
   std::string map_frame_;
   std::string robot_base_frame_;
 
-
   // Controller
   ControllerMap controllers_;
   pluginlib::ClassLoader<nav_drone_core::Controller> loader_;
@@ -243,13 +242,8 @@ void init()
 // ODOM SUBSCRIPTION ////////////////////////////////////////////////////////////////////////////////////////////////
   void odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg) 
   {
-    // The twist in the odometry message is published in a frame (FRD) with orientation matching the flight controller,
-    // We need to tranform the speed to the robot base frame (FLU). Do that by flipping left <-->right, and up <--> down.  
-    
-    last_velocity_.twist.linear.x = msg->twist.twist.linear.x;
-    last_velocity_.twist.linear.y = - msg->twist.twist.linear.y;
-    last_velocity_.twist.linear.x = - msg->twist.twist.linear.z;
-    last_velocity_.twist.angular.z = - msg->twist.twist.angular.z;
+    last_velocity_.header = msg->header;
+    last_velocity_.twist = msg->twist.twist;
   }
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_subscription_;
 
@@ -331,6 +325,7 @@ void init()
     if (goal_handle->is_canceling()) {
       // result->planning_time = this->now() - start_time;
       goal_handle->canceled(result);
+      server_mutex.unlock();
       RCLCPP_INFO(this->get_logger(), "Goal canceled before the first map has been received!");
       return;
     }
@@ -360,10 +355,9 @@ void init()
         }
         
         // Compute and publish velocity
-        geometry_msgs::msg::PoseStamped pose;   
-        
+        geometry_msgs::msg::PoseStamped pose;           
         if (!nav_drone_util::getCurrentPose(pose, *tf_buffer_, map_frame_, robot_base_frame_, transform_tolerance_)) {
-          throw nav_drone_core::DroneException("Failed to obtain robot pose.");
+          throw nav_drone_core::ControllerTFError("Failed to obtain robot pose.");
         }
 
         // Check if the robot is stuck here (for longer than a timeout)
@@ -371,7 +365,7 @@ void init()
         
         try {
           geometry_msgs::msg::TwistStamped setpoint;
-          setpoint = controllers_[current_controller_]->computeVelocityCommands( pose, last_velocity_.twist);      
+          setpoint = controllers_[current_controller_]->computeVelocityCommands( pose, last_velocity_.twist );      
 
           RCLCPP_INFO(this->get_logger(), "Publishing velocity [%.2f, %.2f, %.2f, %.4f]", 
             setpoint.twist.linear.x, 

@@ -202,25 +202,29 @@ inline geometry_msgs::msg::Point sphereSegmentIntersection(
   const geometry_msgs::msg::Point & cen,
   double r)
 {
-  // Formula for intersection of a line with a sphere centered at the origin,
+  // Formula for intersection of a line with a sphere centered at cen,
   // modified to allways return the point that is on the segment between the two points.
   // If one of the points is not inside the sphere, an exception will be thrown
   // https://stackoverflow.com/questions/6533856/ray-sphere-intersection
   
-  double xA = p1.x - cen.x;
-  double yA = p1.y - cen.y;
-  double zA = p1.z - cen.z;
+  double xA = p1.x;
+  double yA = p1.y;
+  double zA = p1.z;
 
-  double xB = p2.x - cen.x;
-  double yB = p2.y - cen.y;
-  double zB = p2.z - cen.z;
+  double xB = p2.x;
+  double yB = p2.y;
+  double zB = p2.z;
+  
+  double xC = cen.x;
+  double yC = cen.y;
+  double zC = cen.z;
   
   //a = (xB-xA)²+(yB-yA)²+(zB-zA)²
   double a = pow(xB-xA,2) + pow(yB-yA,2) + pow(zB-zA,2); 
   //b = 2*((xB-xA)(xA-xC)+(yB-yA)(yA-yC)+(zB-zA)(zA-zC))
-  double b = 2 * ((xB-xA)*(xA-0) + (yB-yA)*(yA-0)+(zB-zA)*(zA-0));  
+  double b = 2 * ((xB-xA)*(xA-xC) + (yB-yA)*(yA-yC) + (zB-zA)*(zA-zC));  
   //c = (xA-xC)²+(yA-yC)²+(zA-zC)²-r²
-  double c = pow(xA-0,2) + pow(yA-0,2) + pow(zA-0,2) - pow(r,2); 
+  double c = pow(xA-xC,2) + pow(yA-yC,2) + pow(zA-zC,2) - pow(r,2); 
   
   double delta = pow(b,2)-4*a*c;
   if (delta == 0.0) {
@@ -246,15 +250,9 @@ inline geometry_msgs::msg::Point sphereSegmentIntersection(
     r2.y = yA + d2*(yB-yA);
     r2.z = zA + d2*(zB-zA);
     
-    if (nav_drone_util::euclidean_distance(r1,p2,true) < nav_drone_util::euclidean_distance(r2,p2,true)) {
-      r1.x += cen.x;
-      r1.y += cen.y;
-      r1.z += cen.z;      
+    if (euclidean_distance(r1,p2,true) < euclidean_distance(r2,p2,true)) {    
       return r1;
-    } else {
-      r2.x += cen.x;
-      r2.y += cen.y;
-      r2.z += cen.z;      
+    } else {   
       return r2;
     }
   }
