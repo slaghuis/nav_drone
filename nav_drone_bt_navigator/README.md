@@ -14,7 +14,8 @@ The navigation server depends on the [BehaviourTree.CPP](https://github.com/Beha
 ## Usage
 Call the action server 
 ```
-ros2 action send_goal nav_drone/navigate_to_pose "nav_drone_msgs/action/NavigateToPose" '{pose: {pose: {position: {x: 5.0, y: 1.0, z: 2.0}, orientation: { x: 0, y: 0, z:0, w: 1}}, header: {frame_id: `map`}}, behavior_tree: sample.xml}'
+ros2 action send_goal nav_drone/navigate_to_pose "nav_drone_msgs/action/NavigateToPose" "{pose: {pose: {position: {x: 5.0, y: 1.0, z: 2.0}, orientation: { x: 0, y: 0, z: 0, w: 1}}, header: {frame_id: map}}, behavior_tree: sample.xml}"
+
 ```
 
 # Code Status
