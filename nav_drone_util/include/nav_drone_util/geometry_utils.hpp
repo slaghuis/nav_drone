@@ -259,7 +259,7 @@ inline geometry_msgs::msg::Point sphereSegmentIntersection(
   
   throw GeometryBoundsError("Line segment does not intersect sphere");      
 }  
-
+  
 }  // namespace nav_drone_util
 
 #endif  // NAV_DRONE_UTIL__GEOMETRY_UTILS_HPP_

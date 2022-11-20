@@ -26,6 +26,8 @@ find_package(action_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/Costmap.msg"
+  "msg/CostmapMetaData.msg"
   "action/ComputePathToPose.action"
   "action/FollowPath.action"
   "action/FollowWaypoints.action"
