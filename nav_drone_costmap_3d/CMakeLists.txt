@@ -1,11 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 project(nav_drone_costmap_3d)
 
-# Default to C99
-if(NOT CMAKE_C_STANDARD)
-  set(CMAKE_C_STANDARD 99)
-endif()
-
 # Default to C++17
 if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 17)
@@ -15,10 +10,10 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# find dependencies
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake_modules)
+
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(rclcpp_action REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(nav_drone_core REQUIRED)
 find_package(nav_drone_util REQUIRED)
@@ -33,17 +28,19 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(octomap REQUIRED)
 find_package(octomap_msgs REQUIRED)
 
-add_library(costmap_publisher_lib SHARED
+include_directories(include)
+
+set(costmap_publisher_executable costmap_publisher)
+
+set(library_name ${costmap_publisher_executable}_lib)  
+
+add_library(${library_name} SHARED
   src/costmap_3d.cpp
-  src/costmap_server.cpp)
-target_include_directories(costmap_publisher_lib PRIVATE
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
-target_compile_definitions(costmap_publisher_lib
-  PRIVATE "NAV_DRONE_COSTMAP_PUBLISHER_BUILDING_DLL")
-ament_target_dependencies(costmap_publisher_lib
+  src/costmap_server.cpp
+)
+  
+set(dependencies
   rclcpp
-  rclcpp_action
   rclcpp_components
   nav_drone_core
   nav_drone_util
@@ -56,12 +53,44 @@ ament_target_dependencies(costmap_publisher_lib
   tf2_msgs
   tf2_geometry_msgs
   octomap
-  octomap_msgs)
-rclcpp_components_register_node(costmap_publisher_lib PLUGIN "nav_drone::Costmap_publisher" EXECUTABLE costmap_publisher)
+  octomap_msgs
+)
+
+ament_target_dependencies( ${library_name}
+  ${dependencies}
+)
+
+add_executable(costmap_publisher
+  src/main.cpp
+)
+  
+target_link_libraries(costmap_publisher
+  ${library_name}
+)
+
+ament_target_dependencies( costmap_publisher
+  ${dependencies}
+)
+    
+rclcpp_components_register_nodes(${library_name} "nav_drone_costmap_3d::CostmapPublisher")
+
 install(TARGETS
-  costmap_publisher_lib
+  ${library_name}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
+
+install(TARGETS
+  costmap_publisher
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
+)
+
+install(DIRECTORY include/ DESTINATION include/)
+
+install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
+
+ament_export_include_directories(include)
+ament_export_libraries( ${library_name})
+ament_export_dependencies( ${dependencies})
 
 ament_package()

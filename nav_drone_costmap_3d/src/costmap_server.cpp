@@ -18,39 +18,38 @@
  * Publishes this costmap on a regular interval
  * *************************************************************/
 
-#include <functional>
-#include <memory>
-#include <chrono>
-#include <thread>
-#include <mutex>       // std::mutex
-#include <unordered_map>
-#include <iterator>
-#include <vector>
+//#include <functional>
+//#include <memory>
+//#include <chrono>
+//#include <thread>
+//#include <mutex>       // std::mutex
+//#include <unordered_map>
+//#include <iterator>
+//#include <vector>
 
-#include "builtin_interfaces/msg/duration.hpp"
-#include "geometry_msgs/msg/pose_stamped.hpp"
-#include "nav_msgs/msg/odometry.hpp"
+//#include "builtin_interfaces/msg/duration.hpp"
+//#include "geometry_msgs/msg/pose_stamped.hpp"
+//#include "nav_msgs/msg/odometry.hpp"
 
-#include "rclcpp/rclcpp.hpp"
-#include "rclcpp_action/rclcpp_action.hpp"
-#include "rclcpp_components/register_node_macro.hpp"
+//#include "rclcpp/rclcpp.hpp"
 
-#include <tf2_ros/buffer.h>
-#include <tf2/exceptions.h>
-#include <tf2_ros/transform_listener.h>
+//#include <tf2_ros/buffer.h>
+//#include <tf2/exceptions.h>
+//#include <tf2_ros/transform_listener.h>
 
-#include "nav_drone_msgs/msg/costmap.hpp"
+//#include "nav_drone_msgs/msg/costmap.hpp"
+#include "nav_drone_costmap_3d/costmap_server.hpp"
 #include "nav_drone_costmap_3d/costmap_3d.hpp"
 #include "nav_drone_costmap_3d/cost_values.hpp"
+
 #include "nav_drone_util/robot_utils.hpp"
 #include "nav_drone_util/node_utils.hpp"
-
 #include "nav_drone_core/costmap_exceptions.hpp"
 
-#include <octomap/octomap.h>
-#include <octomap/OcTree.h>
-#include <octomap_msgs/conversions.h>
-#include <octomap_msgs/msg/octomap.hpp>
+//#include <octomap/octomap.h>
+//#include <octomap/OcTree.h>
+//#include <octomap_msgs/conversions.h>
+//#include <octomap_msgs/msg/octomap.hpp>
 
 using namespace std::chrono_literals;
 using namespace std::placeholders;
@@ -58,21 +57,12 @@ using namespace std::placeholders;
 namespace nav_drone_costmap_3d {
 
 
-class CostmapPublisher : public rclcpp::Node
-{
-public:
-  CostmapPublisher(const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
-  : Node("costmap_publisher", options)
+CostmapPublisher::CostmapPublisher()
+  : Node("costmap_publisher")
   {
     costmap_ = std::make_shared<Costmap3D>(ALPHA_RES);
     last_costmap_update_ = this->get_clock()->now();
-   
-    // Create a transform listener
-    tf_buffer_ =
-      std::make_shared<tf2_ros::Buffer>(this->get_clock());      
-    transform_listener_ =
-      std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
-    
+       
     // Declare and get parameters    
     nav_drone_util::declare_parameter_if_not_declared(
       this, "map_frame", rclcpp::ParameterValue("map"));
@@ -107,43 +97,10 @@ public:
       use_velocity_scaled_lookahead_dist_);
     this->get_parameter("robot_radius", robot_radius_);
     this->get_parameter("safety_radius", safety_radius_);
-     RCLCPP_INFO(this->get_logger(), "Initialisation start");   
-    one_off_timer_ = this->create_wall_timer(
-      200ms, std::bind(&CostmapPublisher::init, this));            
-  }
-
-protected:
-  // Variables for node paramaters
-  std::string map_frame_;
-  std::string robot_base_frame_;
-  double transform_tolerance_;
-  double lookahead_dist_;
-  double min_lookahead_dist_;
-  double max_lookahead_dist_;
-  double lookahead_time_;
-  bool use_velocity_scaled_lookahead_dist_;
-  double robot_radius_;
-  double safety_radius_;
-      
-private:
-  std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
-  std::shared_ptr<tf2_ros::TransformListener> transform_listener_{nullptr};
-  std::shared_ptr<octomap::OcTree> octomap_;
-  std::shared_ptr<Costmap3D> costmap_;
-      
-  rclcpp::Clock steady_clock_{RCL_STEADY_TIME};
-  rclcpp::TimerBase::SharedPtr one_off_timer_;
-  rclcpp::TimerBase::SharedPtr timer_;
-
-  std::mutex costmap_mutex;
-  rclcpp::Time last_costmap_update_, last_octomap_update_;
-  double last_costmap_radius_;
-  geometry_msgs::msg::Pose last_update_pose_;
-  geometry_msgs::msg::Twist last_velocity_;
-  
-  void init() {    
-    // Only run this once.  Stop the timer that triggered this.
-    this->one_off_timer_->cancel();
+   
+    // Create a transform listener
+    tf_buffer_ =
+      std::make_shared<tf2_ros::Buffer>(this->get_clock());      
         
     // ROS2 Subscriptions
     map_subscription_ = this->create_subscription<octomap_msgs::msg::Octomap>(
@@ -155,13 +112,10 @@ private:
     costmap_publisher_ = this->create_publisher<nav_drone_msgs::msg::Costmap>("nav_drone/costmap", 10);  
     timer_ = this->create_wall_timer(
       1000ms, std::bind(&CostmapPublisher::publish_costmap, this));   
-      
-    RCLCPP_INFO(this->get_logger(), "Initialisation done");   
-  
   }
-  
-  // MAP SUBSCRIPTION ////////////////////////////////////////////////////////////////////////////////////////////////
-  void map_callback(const octomap_msgs::msg::Octomap::SharedPtr msg) 
+
+// MAP SUBSCRIPTION ////////////////////////////////////////////////////////////////////////////////////////////////
+void CostmapPublisher::map_callback(const octomap_msgs::msg::Octomap::SharedPtr msg) 
   {
     // Convert ROS message to a OctoMap
     octomap::AbstractOcTree* tree = octomap_msgs::msgToMap(*msg);
@@ -176,7 +130,7 @@ private:
   rclcpp::Subscription<octomap_msgs::msg::Octomap>::SharedPtr map_subscription_;
   
   // ODOM SUBSCRIPTION ////////////////////////////////////////////////////////////////////////////////////////////////
-  void odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg) 
+void CostmapPublisher::odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg) 
   {
     //last_velocity_.header = msg->header;
     last_velocity_ = msg->twist.twist;
@@ -185,7 +139,7 @@ private:
   
   // MAP UPDATE COSTMAP ////////////////////////////////////////////////////////////////////////////////////////////////
   
-  std::pair<double, double> calculate_ez(const geometry_msgs::msg::PoseStamped & current_pose,
+std::pair<double, double> CostmapPublisher::calculate_ez(const geometry_msgs::msg::PoseStamped & current_pose,
                                          const geometry_msgs::msg::PoseStamped & target_pose)
   {    
     // Using direction cosines as discussed
@@ -210,7 +164,7 @@ private:
   }  
 
 
-  std::pair<int, int> get_ez_grid_pos(const octomap::point3d & goal)
+std::pair<int, int> CostmapPublisher::get_ez_grid_pos(const octomap::point3d & goal)
   {
     // Now we want to work in the base_link frame to incorporate the yaw of the drone.  
     geometry_msgs::msg::PoseStamped goal_pose;
@@ -238,7 +192,7 @@ private:
     return std::pair<int, int>(e,z);
   } 
 
-  bool update_costmap(const geometry_msgs::msg::PoseStamped & current_pose,
+bool CostmapPublisher::update_costmap(const geometry_msgs::msg::PoseStamped & current_pose,
                       const double bounding_box_radius) {
     
     if(octomap_ == nullptr){ 
@@ -297,7 +251,7 @@ private:
   } 
         
   // COSTMAP PUBLISHER ////////////////////////////////////////////////////////////////////////////////////////////////
-  double getLookAheadDistance(
+double CostmapPublisher::getLookAheadDistance(
     const geometry_msgs::msg::Twist & speed)
   {
     // If using velocity-scaled look ahead distances, find and clamp the dist
@@ -311,7 +265,7 @@ private:
     return lookahead_dist;
   } 
   
-  void publish_costmap() {
+void CostmapPublisher::publish_costmap() {
   
     if ( (octomap_ != nullptr) && (last_octomap_update_ > last_costmap_update_) ) {
       // if a new octomap has been received, update the costmap
@@ -363,8 +317,4 @@ private:
   rclcpp::Publisher<nav_drone_msgs::msg::Costmap>::SharedPtr costmap_publisher_;
         
   
-};  // class CostmapPublisher
-
-}  // namespace navigation_lite
-
-RCLCPP_COMPONENTS_REGISTER_NODE(nav_drone_costmap_3d::CostmapPublisher)
+}  // namespace nav_drone_costmap_3d
