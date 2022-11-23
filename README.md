@@ -1,6 +1,7 @@
 # Drone Navigation
-Based on the [ROS2 Navigation Framework and System](https://github.com/ros-planning/navigation2) this is an attempt at building full 3D navigation.  The primary differences are:
- - All navigation is done in 3D space.  This is achieved by mainaining a dome of varying size around the robot that is informed from a 3D pointcould.  The initial case will run a Octomap Server.  This is a fundamental change the local costmap.  All planners and controllers are 3D spactially enabled.  This allows the drone the flu over or under an obstacle, rather than the long way around.
+Based on the [ROS2 Navigation Framework and System](https://github.com/ros-planning/navigation2) this is an attempt at building non-planar navigation stack.  The primary differences are:
+ - All navigation is done using a speed dependent polar histogram around the robot.  This is achieved by mainaining a dome of varying size around the robot that is informed from an octomap.  This replaces the costmap as used in the ROS2 Navigation Framework.
+ - All planners and controllers are 3D spactially enabled.  This allows the drone the fly over or under an obstacle, rather than the long way around.
  - This packages still does not use Lifecycle Nodes.  One day...
  
 All coding was started from scratch, but I referrenced a lot of the work done by the contributors to the [ROS2 Navigation Framework and System](https://github.com/ros-planning/navigation2).  Where appropriate I retained all licenase agreements.  I do believe this effort is in the spirit of open source code.  Please feel free to copy, use and alter my code.  If you sell it, please consider me.
