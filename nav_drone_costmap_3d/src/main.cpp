@@ -21,8 +21,6 @@
 
 int main(int argc, char * argv[])
 {
-  //std::string node_name("costmap_server");
-
   rclcpp::init(argc, argv);
   rclcpp::spin(std::make_shared<nav_drone_costmap_3d::CostmapPublisher>());
   rclcpp::shutdown();
