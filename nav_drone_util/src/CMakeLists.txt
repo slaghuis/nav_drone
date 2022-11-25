@@ -1,7 +1,9 @@
 add_library(${library_name} SHARED
-  robot_utils.cpp
   angle_utils.cpp
+  costmap_utils.cpp
+  node_thread.cpp
   node_utils.cpp
+  robot_utils.cpp
 )
 
 ament_target_dependencies(${library_name}

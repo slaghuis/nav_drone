@@ -91,8 +91,6 @@ private:
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_subscription_;
   
   // MAP UPDATE COSTMAP ////////////////////////////////////////////////////////////////////////////////////////////////  
-  std::pair<double, double> calculate_ez(const geometry_msgs::msg::PoseStamped & current_pose,
-                                         const geometry_msgs::msg::PoseStamped & target_pose);
   std::pair<int, int> get_ez_grid_pos(const octomap::point3d & goal);
   bool update_costmap(const geometry_msgs::msg::PoseStamped & current_pose,
                       const double bounding_box_radius);

@@ -26,6 +26,7 @@
 
 #include "nav_drone_util/robot_utils.hpp"
 #include "nav_drone_util/node_utils.hpp"
+#include "nav_drone_util/costmap_utils.hpp"
 #include "nav_drone_core/costmap_exceptions.hpp"
 
 using namespace std::chrono_literals;
@@ -114,32 +115,6 @@ void CostmapPublisher::odom_callback(const nav_msgs::msg::Odometry::SharedPtr ms
 rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_subscription_;
   
 // MAP UPDATE COSTMAP ////////////////////////////////////////////////////////////////////////////////////////////////
-  
-std::pair<double, double> CostmapPublisher::calculate_ez(const geometry_msgs::msg::PoseStamped & current_pose,
-                                         const geometry_msgs::msg::PoseStamped & target_pose)
-{    
-  // Using direction cosines as discussed
-  // https://gis.stackexchange.com/questions/108547/how-to-calculate-distance-azimuth-and-dip-from-two-xyz-coordinates
-  // by https://gis.stackexchange.com/users/2581/gene
-  
-  double distance = std::hypot(target_pose.pose.position.x - current_pose.pose.position.x, 
-                               target_pose.pose.position.y - current_pose.pose.position.y, 
-                               target_pose.pose.position.z - current_pose.pose.position.z);
-  double cosalpha = (target_pose.pose.position.x - current_pose.pose.position.x) / distance;
-  double cosbeta = (target_pose.pose.position.y - current_pose.pose.position.y) / distance;
-  double cosgamma = (target_pose.pose.position.z - current_pose.pose.position.z) / distance;
-  double plunge = asin(cosgamma);   // # the resulting dip_plunge is positive downward if z2 > z1
-    
-  // prevent division by zero
-  if ( (cosalpha == 0.0) && (cosbeta == 0.0) ) {
-    cosalpha = 0.000001;
-  }
-  double azimuth =  atan2(cosalpha, cosbeta); 
-    
-  return std::pair<double, double>(plunge, azimuth);
-}  
-
-
 std::pair<int, int> CostmapPublisher::get_ez_grid_pos(const octomap::point3d & goal)
 {
   // Now we want to work in the base_link frame to incorporate the yaw of the drone.  
@@ -159,7 +134,7 @@ std::pair<int, int> CostmapPublisher::get_ez_grid_pos(const octomap::point3d & g
   goal_pose.pose.position.y = 0.0;
   goal_pose.pose.position.z = 0.0;
         
-  auto ez = calculate_ez(source_pose, voxel);
+  auto ez = nav_drone_util::calculate_ez(source_pose, voxel);
     
   // Moving the values into positive whole numbers, scaled to fit into our matrix
   double e = floor( (90.0 + nav_drone_util::rad_to_deg( ez.first) ) / ALPHA_RES);
