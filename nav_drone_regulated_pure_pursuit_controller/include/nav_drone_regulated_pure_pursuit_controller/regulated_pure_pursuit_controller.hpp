@@ -13,12 +13,7 @@
 
 namespace nav_drone_regulated_pure_pursuit_controller
 {  
-static constexpr unsigned char NO_INFORMATION = 255;
-static constexpr unsigned char LETHAL_OBSTACLE = 254;
-static constexpr unsigned char INSCRIBED_INFLATED_OBSTACLE = 253;
-static constexpr unsigned char MAX_NON_OBSTACLE = 252;
-static constexpr unsigned char FREE_SPACE = 0;  
-     
+    
 class RegulatedPurePursuitController : public nav_drone_core::Controller
 {
   public:
@@ -28,11 +23,11 @@ class RegulatedPurePursuitController : public nav_drone_core::Controller
   
     void configure(
       const rclcpp::Node::SharedPtr node, 
-      std::string name, std::shared_ptr<tf2_ros::Buffer> tf,
-      std::shared_ptr<octomap::OcTree> costmap ) override;
+      std::string name, //std::shared_ptr<tf2_ros::Buffer> tf,
+      std::shared_ptr<nav_drone_costmap_3d::CostmapPublisher> costmap ) override;
     
     void setPath(const nav_msgs::msg::Path & path) override;
-    void updateMap(std::shared_ptr<octomap::OcTree> costmap) override;
+    void updateMap(std::shared_ptr<nav_drone_costmap_3d::CostmapPublisher> costmap) override;
     
     geometry_msgs::msg::TwistStamped computeVelocityCommands(
       const geometry_msgs::msg::PoseStamped & pose,
@@ -44,7 +39,7 @@ class RegulatedPurePursuitController : public nav_drone_core::Controller
      * @param cmd the current speed to use to compute lookahead point
      * @return lookahead distance
      */
-    double getLookAheadDistance(const geometry_msgs::msg::Twist &);
+    //double getLookAheadDistance(const geometry_msgs::msg::Twist &);
 
     /**
      * @brief Whether robot should rotate to rough path heading
@@ -73,14 +68,6 @@ class RegulatedPurePursuitController : public nav_drone_core::Controller
       double & linear_vel, double & angular_vel,
       const double & angle_to_path, const geometry_msgs::msg::Twist & curr_speed);
   
-    /**
-     * @brief Cost at a point
-     * @param x Pose of pose x
-     * @param y Pose of pose y
-     * @return Cost of pose in costmap
-     */
-    double costAtPose(const double & x, const double & y, const double & z);
-
     double approachVelocityScalingFactor(
       const geometry_msgs::msg::PoseStamped & pose
     ) const;
@@ -101,7 +88,7 @@ class RegulatedPurePursuitController : public nav_drone_core::Controller
      */
     void applyConstraints(
       const double & curvature, 
-      const double & pose_cost, 
+      const unsigned char & pose_cost, 
       const geometry_msgs::msg::PoseStamped & pose,
       double & linear_vel, double & sign);
       
@@ -125,8 +112,8 @@ class RegulatedPurePursuitController : public nav_drone_core::Controller
   
     rclcpp::Node::SharedPtr node_;
     std::string plugin_name_;
-    std::shared_ptr<tf2_ros::Buffer> tf_;
-    std::shared_ptr<octomap::OcTree> costmap_;
+//    std::shared_ptr<tf2_ros::Buffer> tf_;
+    std::shared_ptr<nav_drone_costmap_3d::CostmapPublisher> costmap_;
     rclcpp::Logger logger_ {rclcpp::get_logger("RegulatedPurePursuitController")};
     rclcpp::Clock::SharedPtr clock_;
   
@@ -134,18 +121,16 @@ class RegulatedPurePursuitController : public nav_drone_core::Controller
       
     double desired_linear_vel_; 
     double base_desired_linear_vel_;
-    double lookahead_dist_;
+//    double lookahead_dist_;
     double rotate_to_heading_angular_vel_;
-    double max_lookahead_dist_;
-    double min_lookahead_dist_;
-    double lookahead_time_;
-    bool use_velocity_scaled_lookahead_dist_;
-    double cost_map_size_;
-    double transform_tolerance_;
+//    double max_lookahead_dist_;
+//    double min_lookahead_dist_;
+//    double lookahead_time_;
+//    bool use_velocity_scaled_lookahead_dist_;
+//    double transform_tolerance_;
     double min_approach_linear_velocity_;
     double approach_velocity_scaling_dist_;
     double control_duration_;
-    double max_allowed_time_to_collision_up_to_carrot_;
     bool use_collision_detection_;
     bool use_regulated_linear_velocity_scaling_;
     bool use_cost_regulated_linear_velocity_scaling_;
@@ -166,7 +151,7 @@ class RegulatedPurePursuitController : public nav_drone_core::Controller
     double inscribed_radius_;
   private:  
     
-    double costmapSize();
+//    double costmapSize();
             
 };
   

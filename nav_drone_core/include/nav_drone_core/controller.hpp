@@ -9,9 +9,9 @@
 #include "geometry_msgs/msg/twist.hpp"
 #include "geometry_msgs/msg/twist_stamped.hpp"
 #include "nav_msgs/msg/path.hpp"
+#include "nav_drone_costmap_3d/costmap_server.hpp"
+#include "nav_drone_costmap_3d/cost_values.hpp"
 
-#include <octomap/octomap.h>
-#include <octomap/OcTree.h>
 
 namespace nav_drone_core
 {
@@ -21,11 +21,11 @@ namespace nav_drone_core
       using Ptr = std::shared_ptr<Controller>;
     
       virtual void configure(const rclcpp::Node::SharedPtr parent, 
-                             std::string name, std::shared_ptr<tf2_ros::Buffer> tf,
-                             std::shared_ptr<octomap::OcTree> costmap ) = 0;
+                             std::string name, //std::shared_ptr<tf2_ros::Buffer> tf,
+                             std::shared_ptr<nav_drone_costmap_3d::CostmapPublisher> costmap ) = 0;
     
       virtual void setPath(const nav_msgs::msg::Path & path) = 0;
-      virtual void updateMap(std::shared_ptr<octomap::OcTree> costmap) = 0;
+      virtual void updateMap(std::shared_ptr<nav_drone_costmap_3d::CostmapPublisher> costmap) = 0;
     
       virtual geometry_msgs::msg::TwistStamped computeVelocityCommands(
         const geometry_msgs::msg::PoseStamped & pose,

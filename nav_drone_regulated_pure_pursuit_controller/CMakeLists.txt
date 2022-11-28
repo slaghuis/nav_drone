@@ -15,6 +15,7 @@ find_package(ament_cmake REQUIRED)
 find_package(nav_drone_core REQUIRED)
 find_package(nav_drone_util REQUIRED)
 find_package(nav_drone_msgs REQUIRED)
+find_package(nav_drone_costmap_3d REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(tf2 REQUIRED)
@@ -32,6 +33,7 @@ set(dependencies
   nav_drone_core
   nav_drone_util
   nav_drone_msgs
+  nav_drone_costmap_3d
   geometry_msgs
   tf2
   tf2_geometry_msgs

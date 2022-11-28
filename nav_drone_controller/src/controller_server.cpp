@@ -13,9 +13,6 @@
 // limitations under the License.
 
 /* **********************************************************************
- * Subscribe to tf2 map->base_link for position and pose data
- * Subscribe to nav_lite/map [octomap_msgs::msg::Octomap] 
- *
  * Action Server responding to nav_drone_msgs/action/FollowPath
  *   typically called only by the Navigation Server
  * Publishes cmd_vel as geometry_msgs/msg/Twist to effect motion.
@@ -48,23 +45,16 @@
 
 #include "nav_drone_util/angle_utils.hpp"
 #include "nav_drone_util/node_utils.hpp"
+#include "nav_drone_util/node_thread.hpp"
 #include "nav_drone_util/robot_utils.hpp"
 #include "nav_drone_util/visibility_control.h"
 #include "nav_drone_util/holddown_timer.hpp"
 #include "nav_drone_core/exceptions.hpp"
 #include "nav_drone_core/controller_exceptions.hpp"
 #include "nav_drone_core/controller.hpp"
+#include "nav_drone_costmap_3d/costmap_server.hpp"
 
 #include <pluginlib/class_loader.hpp>
-
-#include <tf2/exceptions.h>
-#include <tf2_ros/transform_listener.h>
-#include <tf2_ros/buffer.h>
-
-#include <octomap/octomap.h>
-#include <octomap/OcTree.h>
-#include <octomap_msgs/conversions.h>
-#include "octomap_msgs/msg/octomap.hpp"
 
 static const float DEFAULT_WAYPOINT_RADIUS_ERROR = 0.3; // Acceptable XY distance to waypoint deemed as close enough
 static const float DEFAULT_YAW_THRESHOLD = 0.025;       // Acceptible YAW deemed as close enough
@@ -88,18 +78,11 @@ public:
   explicit ControllerServer(const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
   : Node("controller_server", options),
     loader_("nav_drone_core", "nav_drone_core::Controller"),
-    default_ids_{"PIDController", "RegulatedPurePursuitController"},
-    default_types_{"nav_drone_pid_controller/PIDController", "nav_drone_regulated_pure_pursuit_controller/RegulatedPurePursuitController"}
-//    default_ids_{"MPCController", "PIDController", "PurePursuitController"},
-//    default_types_{"nav_drone_mpc_controller/MPCController", "nav_drone_pid_controller/PIDController", "nav_drone_regulated_pure_pursuit_controller/RegulatedPurePursuitController"}
+    default_ids_{"RegulatedPurePursuitController"},
+    default_types_{"nav_drone_regulated_pure_pursuit_controller/RegulatedPurePursuitController"}
+//    default_ids_{"PIDController", "RegulatedPurePursuitController"},
+//    default_types_{"nav_drone_pid_controller/PIDController", "nav_drone_regulated_pure_pursuit_controller/RegulatedPurePursuitController"}
   {
-  
-    // Create a transform listener
-    tf_buffer_ =
-      std::make_shared<tf2_ros::Buffer>(this->get_clock());      
-    transform_listener_ =
-      std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
-    
     // Declare and get parameters    
     nav_drone_util::declare_parameter_if_not_declared(
       this, "control_frequency", rclcpp::ParameterValue(10.0));   // Control frequency in Hz.  Must be bigger than 2 Hz
@@ -109,12 +92,6 @@ public:
       this, "yaw_threshold", rclcpp::ParameterValue(DEFAULT_YAW_THRESHOLD)); 
     nav_drone_util::declare_parameter_if_not_declared(
       this, "holddown", rclcpp::ParameterValue(DEFAULT_HOLDDOWN));       
-    nav_drone_util::declare_parameter_if_not_declared(
-      this, "map_frame", rclcpp::ParameterValue("map"));
-    nav_drone_util::declare_parameter_if_not_declared(
-      this, "robot_base_frame", rclcpp::ParameterValue("base_link"));      
-    nav_drone_util::declare_parameter_if_not_declared(
-      this, "transform_tolerance", rclcpp::ParameterValue(0.1));      
     declare_parameter("controller_plugins", default_ids_);
     declare_parameter("controller_types", default_types_);  
       
@@ -122,15 +99,23 @@ public:
     this->get_parameter("waypoint_radius_error", waypoint_radius_error_);
     this->get_parameter("yaw_threshold", yaw_threshold_);
     this->get_parameter("holddown", holddown_);
-    this->get_parameter("map_frame", map_frame_);
-    this->get_parameter("robot_base_frame", robot_base_frame_);
-    this->get_parameter("transform_tolerance", transform_tolerance_); 
     this->get_parameter("controller_plugins", controller_ids_);
     this->get_parameter("controller_types", controller_types_);
+    
+    // The costmap node is used in the implementation of the controller
+    costmap_ros_ = std::make_shared<nav_drone_costmap_3d::CostmapPublisher>(
+    "local_costmap", std::string{get_namespace()});
+    // Launch a thread to run the costmap node
+    costmap_thread_ = std::make_unique<nav_drone_util::NodeThread>(costmap_ros_);
     
     one_off_timer_ = this->create_wall_timer(
       200ms, std::bind(&ControllerServer::init, this));
   }
+  
+  ~ControllerServer()
+  {
+    costmap_thread_.reset();
+  }  
 
 protected:
   // Variables for node paramaters
@@ -138,9 +123,6 @@ protected:
   float yaw_threshold_;
   int holddown_;
   double controller_frequency_;
-  double transform_tolerance_;
-  std::string map_frame_;
-  std::string robot_base_frame_;
 
   // Controller
   ControllerMap controllers_;
@@ -157,21 +139,21 @@ protected:
   geometry_msgs::msg::TwistStamped last_velocity_;
   geometry_msgs::msg::PoseStamped end_pose_;
   std::shared_ptr<nav_drone_util::HolddownTimer> holddown_timer_;
-  std::shared_ptr<octomap::OcTree> octomap_;
   
   rclcpp::Clock steady_clock_{RCL_STEADY_TIME};
   rclcpp::TimerBase::SharedPtr one_off_timer_;
+  
+    // The controller needs a costmap node
+  std::shared_ptr<nav_drone_costmap_3d::CostmapPublisher> costmap_ros_;
+  std::unique_ptr<nav_drone_util::NodeThread> costmap_thread_;
     
 private:
 // VELOCITY PUBLISHER /////////////////////////////////////////////////////////////////////////////////////////////
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr publisher_;  
 
-// TF2 VARIABLES
-  std::shared_ptr<tf2_ros::TransformListener> transform_listener_{nullptr};
-  std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
 
-void init()
-{
+  void init()
+  {
     // Only run this once.  Stop the timer that triggered this.
     this->one_off_timer_->cancel();
        
@@ -186,7 +168,7 @@ void init()
           get_logger(), "Created controller plugin %s of type %s",
           controller_ids_[i].c_str(), controller_types_[i].c_str());
           
-        controller->configure(node, controller_ids_[i], tf_buffer_, octomap_);
+        controller->configure(node, controller_ids_[i], costmap_ros_);
         controllers_.insert({controller_ids_[i], controller});
       } catch (const pluginlib::PluginlibException & ex) {
         RCLCPP_FATAL(
@@ -205,14 +187,11 @@ void init()
     
     holddown_timer_ = std::make_shared<nav_drone_util::HolddownTimer>(holddown_);    
     
-    // Create drone velocity publisher
+    // Create robot velocity publisher
     publisher_ =
       this->create_publisher<geometry_msgs::msg::Twist>("drone/cmd_vel", 1);
 
     // ROS2 Subscriptions
-    map_subscription_ = this->create_subscription<octomap_msgs::msg::Octomap>(
-      "nav_drone/map", 10, std::bind(&ControllerServer::map_callback, this, _1));
-      
     odom_subscription_ = this->create_subscription<nav_msgs::msg::Odometry>(
       "drone/odom", 10, std::bind(&ControllerServer::odom_callback, this, _1));
   
@@ -224,21 +203,8 @@ void init()
       std::bind(&ControllerServer::handle_cancel, this, _1),
       std::bind(&ControllerServer::handle_accepted, this, _1));
 
-}
-
-// MAP SUBSCRIPTION ////////////////////////////////////////////////////////////////////////////////////////////////
-  void map_callback(const octomap_msgs::msg::Octomap::SharedPtr msg) 
-  {
-    // Convert ROS message to a OctoMap
-    octomap::AbstractOcTree* tree = octomap_msgs::msgToMap(*msg);
-    if (tree) {
-      octomap_ = std::shared_ptr<octomap::OcTree>( dynamic_cast<octomap::OcTree *>(tree));
-    } else {
-      RCLCPP_ERROR(this->get_logger(), "Error creating octree from received message");
-    } 
   }
-  rclcpp::Subscription<octomap_msgs::msg::Octomap>::SharedPtr map_subscription_;
-  
+
 // ODOM SUBSCRIPTION ////////////////////////////////////////////////////////////////////////////////////////////////
   void odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg) 
   {
@@ -312,15 +278,6 @@ void init()
     
     auto start_time = this->now();
     end_pose_ = goal->path.poses.back();
-    if (octomap_ == NULL) {
-      RCLCPP_INFO(this->get_logger(), "Waiting for the first map");
-    }
-    
-    // Wait for the fist map to arrive
-    rclcpp::Rate r(100);
-    while ( (octomap_ == NULL) && !goal_handle->is_canceling() ) {
-      r.sleep();
-    }
     
     if (goal_handle->is_canceling()) {
       // result->planning_time = this->now() - start_time;
@@ -329,7 +286,13 @@ void init()
       RCLCPP_INFO(this->get_logger(), "Goal canceled before the first map has been received!");
       return;
     }
-    
+
+    // Don't compute a trajectory until costmap is valid (after clear costmap)
+    rclcpp::Rate r(100);
+    while (!costmap_ros_->isCurrent()) {
+      r.sleep();
+    }
+
     try
     {    
       std::string c_name = goal->controller_id;
@@ -341,7 +304,7 @@ void init()
       }
       
       controllers_[current_controller_]->setPath( goal->path );
-      controllers_[current_controller_]->updateMap( octomap_ );
+      controllers_[current_controller_]->updateMap( costmap_ros_ );
             
       rclcpp::WallRate loop_rate( controller_frequency_ );
       while ( rclcpp::ok() ) {
@@ -355,8 +318,8 @@ void init()
         }
         
         // Compute and publish velocity
-        geometry_msgs::msg::PoseStamped pose;           
-        if (!nav_drone_util::getCurrentPose(pose, *tf_buffer_, map_frame_, robot_base_frame_, transform_tolerance_)) {
+        geometry_msgs::msg::PoseStamped pose;   
+        if (!getRobotPose(pose)) {
           throw nav_drone_core::ControllerTFError("Failed to obtain robot pose.");
         }
 
@@ -367,7 +330,7 @@ void init()
           geometry_msgs::msg::TwistStamped setpoint;
           setpoint = controllers_[current_controller_]->computeVelocityCommands( pose, last_velocity_.twist );      
 
-          RCLCPP_INFO(this->get_logger(), "Publishing velocity [%.2f, %.2f, %.2f, %.4f]", 
+          RCLCPP_DEBUG(this->get_logger(), "Publishing velocity [%.2f, %.2f, %.2f, %.4f]", 
             setpoint.twist.linear.x, 
             setpoint.twist.linear.y, 
             setpoint.twist.linear.z,
@@ -489,11 +452,20 @@ void init()
     return true;
   }
   
+  bool getRobotPose(geometry_msgs::msg::PoseStamped & pose)
+  {
+    geometry_msgs::msg::PoseStamped current_pose;
+    if (!costmap_ros_->getRobotPose(current_pose)) {
+      return false;
+    }
+    pose = current_pose;
+    return true;
+  }
+  
 // UTILITIES THAT SHOULD BE IN THE GOAL CHECKER PLUGIN  
   bool is_goal_reached() {
     geometry_msgs::msg::PoseStamped pose;
-    
-    if( nav_drone_util::getCurrentPose(pose, *tf_buffer_, map_frame_, robot_base_frame_, transform_tolerance_) ) {   
+    if( getRobotPose(pose)) {   
       double position_error = nav_drone_util::euclidean_distance(pose, end_pose_);      
       double yaw_error = nav_drone_util::getDiff2Angles( nav_drone_util::getYaw(pose.pose.orientation), 
                                                          nav_drone_util::getYaw(end_pose_.pose.orientation), PI);  

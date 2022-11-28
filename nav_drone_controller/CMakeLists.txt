@@ -23,16 +23,11 @@ find_package(rclcpp_components REQUIRED)
 find_package(nav_drone_core REQUIRED)
 find_package(nav_drone_util REQUIRED)
 find_package(nav_drone_msgs REQUIRED)
+find_package(nav_drone_costmap_3d REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
-find_package(tf2 REQUIRED)
-find_package(tf2_ros REQUIRED)
-find_package(tf2_msgs REQUIRED)
-find_package(tf2_geometry_msgs REQUIRED)
-find_package(octomap REQUIRED)
-find_package(octomap_msgs REQUIRED)
 
 add_library(controller_action_server SHARED
   src/controller_server.cpp)
@@ -48,16 +43,11 @@ ament_target_dependencies(controller_action_server
   nav_drone_core
   nav_drone_util
   nav_drone_msgs
+  nav_drone_costmap_3d
   std_msgs
   geometry_msgs
   nav_msgs
-  tf2
-  tf2_ros
-  tf2_msgs
-  tf2_geometry_msgs
-  pluginlib
-  octomap
-  octomap_msgs)
+  pluginlib)
 rclcpp_components_register_node(controller_action_server PLUGIN "nav_drone::ControllerServer" EXECUTABLE controller_server)
 install(TARGETS
   controller_action_server

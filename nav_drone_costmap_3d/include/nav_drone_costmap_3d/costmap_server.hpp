@@ -54,9 +54,74 @@ namespace nav_drone_costmap_3d {
 class CostmapPublisher : public rclcpp::Node
 {
 public:
+  /**
+   * @brief  Constructor for the wrapper, the node will
+   */
   CostmapPublisher();
+  
+  /**
+   * @brief  Constructor for the wrapper, the node will
+   * be placed in a namespace equal to the node's name
+   * @param name Name of the costmap ROS node
+   */
+  explicit CostmapPublisher(const std::string & name);
+
+  /**
+   * @brief  Constructor for the wrapper
+   * @param name Name of the costmap ROS node
+   * @param parent_namespace Absolute namespace of the node hosting the costmap node
+   * @param local_namespace Namespace to append to the parent namespace
+   */
+  explicit CostmapPublisher(
+    const std::string & name,
+    const std::string & parent_namespace
+    );
+
+  /**
+   * @brief Common initialization for constructors
+   */
+  void init();
+  
+  bool isCurrent() const
+  {
+    return current_;
+  }
+
+  std::string getBaseFrameID() const
+  {
+    return robot_base_frame_;
+  }
+
+  std::string getGlobalFrameID() const
+  {
+    return map_frame_;
+  }
+  
+  double getTransformTollerance() const
+  {
+    return transform_tolerance_;
+  }
+
+  bool getRobotPose(geometry_msgs::msg::PoseStamped & global_pose);
+  
+  std::shared_ptr<tf2_ros::Buffer> getTfBuffer() 
+  { 
+    return tf_buffer_; 
+  }
+  
+  double getLookaheadDistance() const
+  {
+    return lookahead_dist_;
+  }  
+  
+unsigned char cost_at_pose(const geometry_msgs::msg::PoseStamped & pose);
 
 protected:
+  std::string name_;
+  std::string parent_namespace_;
+  
+  bool current_;
+  
   // Variables for node paramaters
   std::string map_frame_;
   std::string robot_base_frame_;

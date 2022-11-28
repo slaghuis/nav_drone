@@ -43,12 +43,12 @@ namespace nav_drone_regulated_pure_pursuit_controller
   
   
 void RegulatedPurePursuitController::configure(const rclcpp::Node::SharedPtr node, 
-                                               std::string name, std::shared_ptr<tf2_ros::Buffer> tf,
-                                               std::shared_ptr<octomap::OcTree> costmap )
+                                               std::string name, //std::shared_ptr<tf2_ros::Buffer> tf,
+                                               std::shared_ptr<nav_drone_costmap_3d::CostmapPublisher> costmap )
 {
   node_ = node;
     
-  tf_ = tf;
+//  tf_ = tf;
   plugin_name_ = name;
   costmap_ = costmap;    
   
@@ -62,14 +62,14 @@ void RegulatedPurePursuitController::configure(const rclcpp::Node::SharedPtr nod
     node_, plugin_name_ + ".desired_linear_vel", rclcpp::ParameterValue(0.5));
   nav_drone_util::declare_parameter_if_not_declared(
     node_, plugin_name_ + ".lookahead_dist", rclcpp::ParameterValue(1.6));
-  nav_drone_util::declare_parameter_if_not_declared(
-    node_, plugin_name_ + ".min_lookahead_dist", rclcpp::ParameterValue(0.3));
-  nav_drone_util::declare_parameter_if_not_declared(
-    node_, plugin_name_ + ".max_lookahead_dist", rclcpp::ParameterValue(0.9));
-  nav_drone_util::declare_parameter_if_not_declared(
-    node_, plugin_name_ + ".lookahead_time", rclcpp::ParameterValue(1.5));
-  nav_drone_util::declare_parameter_if_not_declared(
-    node_, plugin_name_ + ".transform_tolerance", rclcpp::ParameterValue(0.1));
+//  nav_drone_util::declare_parameter_if_not_declared(
+//    node_, plugin_name_ + ".min_lookahead_dist", rclcpp::ParameterValue(0.3));
+//  nav_drone_util::declare_parameter_if_not_declared(
+//    node_, plugin_name_ + ".max_lookahead_dist", rclcpp::ParameterValue(0.9));
+//  nav_drone_util::declare_parameter_if_not_declared(
+//    node_, plugin_name_ + ".lookahead_time", rclcpp::ParameterValue(1.5));
+//  nav_drone_util::declare_parameter_if_not_declared(
+//    node_, plugin_name_ + ".transform_tolerance", rclcpp::ParameterValue(0.1));
   nav_drone_util::declare_parameter_if_not_declared(
     node_, plugin_name_ + ".rotate_to_heading_angular_vel", rclcpp::ParameterValue(0.5));
   nav_drone_util::declare_parameter_if_not_declared(
@@ -77,17 +77,17 @@ void RegulatedPurePursuitController::configure(const rclcpp::Node::SharedPtr nod
   nav_drone_util::declare_parameter_if_not_declared(
     node_, plugin_name_ + ".use_regulated_angular_velocity_scaling",
     rclcpp::ParameterValue(true));
-  nav_drone_util::declare_parameter_if_not_declared(
-    node_, plugin_name_ + ".use_velocity_scaled_lookahead_dist",
-    rclcpp::ParameterValue(false));
+//  nav_drone_util::declare_parameter_if_not_declared(
+//    node_, plugin_name_ + ".use_velocity_scaled_lookahead_dist",
+//    rclcpp::ParameterValue(false));
   nav_drone_util::declare_parameter_if_not_declared(
     node_, plugin_name_ + ".min_approach_linear_velocity", rclcpp::ParameterValue(0.05));
   nav_drone_util::declare_parameter_if_not_declared(
     node_, plugin_name_ + ".approach_velocity_scaling_dist", rclcpp::ParameterValue(0.6));
-  nav_drone_util::declare_parameter_if_not_declared(
-    node_, plugin_name_ + ".cost_map_size", rclcpp::ParameterValue(500.0));
-  nav_drone_util::declare_parameter_if_not_declared(
-    node_, plugin_name_ + ".max_allowed_time_to_collision_up_to_carrot", rclcpp::ParameterValue(1.0));
+//  nav_drone_util::declare_parameter_if_not_declared(
+//    node_, plugin_name_ + ".cost_map_size", rclcpp::ParameterValue(500.0));
+//  nav_drone_util::declare_parameter_if_not_declared(
+//    node_, plugin_name_ + ".max_allowed_time_to_collision_up_to_carrot", rclcpp::ParameterValue(1.0));
   nav_drone_util::declare_parameter_if_not_declared(
     node_, plugin_name_ + ".use_collision_detection",
     rclcpp::ParameterValue(false));
@@ -130,36 +130,36 @@ void RegulatedPurePursuitController::configure(const rclcpp::Node::SharedPtr nod
     
   node_->get_parameter(plugin_name_ + ".desired_linear_vel", desired_linear_vel_);
   base_desired_linear_vel_ = desired_linear_vel_;
-  node_->get_parameter(plugin_name_ + ".lookahead_dist", lookahead_dist_);
-  node_->get_parameter(plugin_name_ + ".min_lookahead_dist", min_lookahead_dist_);
-  node_->get_parameter(plugin_name_ + ".max_lookahead_dist", max_lookahead_dist_);
-  node_->get_parameter(plugin_name_ + ".lookahead_time", lookahead_time_);
+//  node_->get_parameter(plugin_name_ + ".lookahead_dist", lookahead_dist_);
+//  node_->get_parameter(plugin_name_ + ".min_lookahead_dist", min_lookahead_dist_);
+//  node_->get_parameter(plugin_name_ + ".max_lookahead_dist", max_lookahead_dist_);
+//  node_->get_parameter(plugin_name_ + ".lookahead_time", lookahead_time_);
 
   node_->get_parameter(
     plugin_name_ + ".rotate_to_heading_angular_vel",
     rotate_to_heading_angular_vel_);
-  node_->get_parameter(plugin_name_ + ".transform_tolerance", transform_tolerance_);
-  node_->get_parameter(
-    plugin_name_ + ".use_velocity_scaled_lookahead_dist",
-    use_velocity_scaled_lookahead_dist_);
+//  node_->get_parameter(plugin_name_ + ".transform_tolerance", transform_tolerance_);
+//  node_->get_parameter(
+//    plugin_name_ + ".use_velocity_scaled_lookahead_dist",
+//    use_velocity_scaled_lookahead_dist_);
   node_->get_parameter(
     plugin_name_ + ".min_approach_linear_velocity",
     min_approach_linear_velocity_);
   node_->get_parameter(
     plugin_name_ + ".approach_velocity_scaling_dist",
     approach_velocity_scaling_dist_);
-  node_->get_parameter(
-    plugin_name_ + ".cost_map_size",
-    cost_map_size_);
+//  node_->get_parameter(
+//    plugin_name_ + ".cost_map_size",
+//    cost_map_size_);
   
-  if (approach_velocity_scaling_dist_ > costmapSize() / 2.0) {
-    RCLCPP_WARN(
-      logger_, "approach_velocity_scaling_dist is larger than forward costmap extent, "
-      "leading to permanent slowdown");
-  }
-  node_->get_parameter(
-    plugin_name_ + ".max_allowed_time_to_collision_up_to_carrot",
-    max_allowed_time_to_collision_up_to_carrot_);
+  //if (approach_velocity_scaling_dist_ > costmapSize() / 2.0) {
+  //  RCLCPP_WARN(
+  //    logger_, "approach_velocity_scaling_dist is larger than forward costmap extent, "
+  //    "leading to permanent slowdown");
+  // }
+  //node_->get_parameter(
+  //  plugin_name_ + ".max_allowed_time_to_collision_up_to_carrot",
+  //  max_allowed_time_to_collision_up_to_carrot_);
   node_->get_parameter(
     plugin_name_ + ".use_collision_detection",
     use_collision_detection_);
@@ -217,29 +217,18 @@ void RegulatedPurePursuitController::configure(const rclcpp::Node::SharedPtr nod
   }
   
 }
-  
-double RegulatedPurePursuitController::costmapSize()
-{
-  double x_size, y_size, z_size;
-  if(costmap_ == NULL) {
-    return cost_map_size_;
-  } else {  
-    costmap_->getMetricSize(x_size, y_size, z_size);
-    return x_size;
-  }  
-}  
 
 void RegulatedPurePursuitController::setPath(const nav_msgs::msg::Path & path)
 {
   global_plan_ = path;
 }
   
-void RegulatedPurePursuitController::updateMap(std::shared_ptr<octomap::OcTree> costmap)
+void RegulatedPurePursuitController::updateMap(std::shared_ptr<nav_drone_costmap_3d::CostmapPublisher> costmap)
 {
   costmap_ = costmap;
 }
   
-double RegulatedPurePursuitController::getLookAheadDistance(
+/*double RegulatedPurePursuitController::getLookAheadDistance(
   const geometry_msgs::msg::Twist & speed)
 {
   // If using velocity-scaled look ahead distances, find and clamp the dist
@@ -253,26 +242,22 @@ double RegulatedPurePursuitController::getLookAheadDistance(
 
   return lookahead_dist;
 }
- 
+*/
+  
 geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocityCommands(
       const geometry_msgs::msg::PoseStamped & pose,    // Current position in map frame
       const geometry_msgs::msg::Twist & speed)         // Current velocity in FLU orientation
 {
-  RCLCPP_INFO(logger_, "Current pos [ %.2f, %.2f, %.2f] Yaw [%.2f] frame %s", 
-              pose.pose.position.x, pose.pose.position.y, pose.pose.position.z,
-              nav_drone_util::getYaw(pose.pose.orientation),
-              pose.header.frame_id.c_str() );
-  
   // Find look ahead distance and point on path
-  double lookahead_dist = getLookAheadDistance(speed);
+  double lookahead_dist = costmap_->getLookaheadDistance();  //getLookAheadDistance(speed);
   auto lookahead_pose = getLookAheadPoint(pose, lookahead_dist);
 
   // let's get the lookahead pose in the robot frame
   geometry_msgs::msg::PoseStamped carrot_pose;
-  if (!nav_drone_util::transformPoseInTargetFrame(lookahead_pose, carrot_pose, *tf_, "base_link", transform_tolerance_)) {
+  if (!nav_drone_util::transformPoseInTargetFrame(lookahead_pose, carrot_pose, *costmap_->getTfBuffer(), costmap_->getBaseFrameID(), costmap_->getTransformTollerance())) {
     throw nav_drone_core::ControllerTFError("Unable to transform lookahead pose into robot's frame");
   }  
-  RCLCPP_INFO(logger_, "carrot [ %.2f, %.2f, %.2f] lookahead_dist %.2f", carrot_pose.pose.position.x, carrot_pose.pose.position.y, carrot_pose.pose.position.z, lookahead_dist);
+//  RCLCPP_INFO(logger_, "carrot [ %.2f, %.2f, %.2f] lookahead_dist %.2f", carrot_pose.pose.position.x, carrot_pose.pose.position.y, carrot_pose.pose.position.z, lookahead_dist);
 
   double linear_vel, angular_vel;
 
@@ -300,23 +285,20 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
   double angle_to_heading;
   if (shouldRotateToGoalHeading(carrot_pose)) {
     geometry_msgs::msg::PoseStamped goal_pose;
-    if (!nav_drone_util::transformPoseInTargetFrame(global_plan_.poses.back(), goal_pose, *tf_, "base_link", transform_tolerance_)) {
+    if (!nav_drone_util::transformPoseInTargetFrame(global_plan_.poses.back(), goal_pose, *costmap_->getTfBuffer(), costmap_->getBaseFrameID(), costmap_->getTransformTollerance())) {
       throw nav_drone_core::ControllerTFError("Unable to transform goal pose into robot's frame");
     }      
     // Should I not calculate the yaw to the goal, instead of the yaw of the goal??????
     double angle_to_goal = nav_drone_util::getYaw(goal_pose);
-    RCLCPP_INFO(logger_, "Rotating to goal : %.3f", angle_to_goal);
     rotateToHeading(linear_vel, angular_vel, angle_to_goal, speed);
   } else if (shouldRotateToPath(carrot_pose, angle_to_heading)) {
-    RCLCPP_INFO(logger_, "Rotating to heading : %.3f", angle_to_heading);
     rotateToHeading(linear_vel, angular_vel, angle_to_heading, speed);
   } else {
     applyConstraints(
       curvature,
-      costAtPose(pose.pose.position.x, pose.pose.position.y, pose.pose.position.z), 
+      costmap_->cost_at_pose(pose), 
       pose, 
       linear_vel, sign);
-    RCLCPP_INFO(logger_, "Flying");
 
     // Apply curvature to angular velocity after constraining linear velocity
     angular_vel = linear_vel * curvature;
@@ -415,20 +397,6 @@ geometry_msgs::msg::PoseStamped RegulatedPurePursuitController::getLookAheadPoin
   return *goal_pose_it;  
 } 
     
-double RegulatedPurePursuitController::costAtPose(const double & x, const double & y, const double & z)
-{
-  
-  auto node = costmap_->search(x,y,z,0);  // 0 scans the whole octree. Should we scan to a set depth? maybe size of robot?
-  
-  if (node==NULL) {
-    return static_cast<double>(NO_INFORMATION); // Unknown space
-      
-  if (costmap_->isNodeOccupied(node))
-    return static_cast<double>(LETHAL_OBSTACLE);
-  } 
-  return static_cast<double>(FREE_SPACE);
-    
-}
   
 double RegulatedPurePursuitController::approachVelocityScalingFactor(const geometry_msgs::msg::PoseStamped & pose) const
 {
@@ -465,7 +433,7 @@ void RegulatedPurePursuitController::applyApproachVelocityScaling(
 }  
 
 void RegulatedPurePursuitController::applyConstraints(
-  const double & curvature,  const double & pose_cost, 
+  const double & curvature,  const unsigned char & pose_cost, 
   const geometry_msgs::msg::PoseStamped & pose, double & linear_vel, double & sign)
 {
   double curvature_vel = linear_vel;
@@ -480,11 +448,11 @@ void RegulatedPurePursuitController::applyConstraints(
 
   // limit the linear velocity by proximity to obstacles
   if (use_cost_regulated_linear_velocity_scaling_ &&
-    pose_cost != static_cast<double>(NO_INFORMATION) &&
-    pose_cost != static_cast<double>(FREE_SPACE))
+    pose_cost != nav_drone_costmap_3d::NO_INFORMATION &&
+    pose_cost != nav_drone_costmap_3d::FREE_SPACE)
   {
     const double min_distance_to_obstacle = (-1.0 / inflation_cost_scaling_factor_) *
-      std::log(pose_cost / (INSCRIBED_INFLATED_OBSTACLE - 1)) + inscribed_radius_;
+      std::log(pose_cost / (nav_drone_costmap_3d::INSCRIBED_INFLATED_OBSTACLE - 1)) + inscribed_radius_;
 
     if (min_distance_to_obstacle < cost_scaling_dist_) {
       cost_vel *= cost_scaling_gain_ * min_distance_to_obstacle / cost_scaling_dist_;
@@ -503,14 +471,8 @@ void RegulatedPurePursuitController::applyConstraints(
 }
 
 double RegulatedPurePursuitController::getCostmapMaxExtent() const
-{
-  double x, y, z;
-  
-  costmap_->getMetricSize(x, y, z);
-  
-//  const double max_costmap_dim_meters = std::max(
-//    costmap_->getSizeInMetersX(), costmap_->getSizeInMetersY());
-  return std::max(x,y) / 2.0;
+{  
+  return costmap_->getLookaheadDistance();
 }  
   
   

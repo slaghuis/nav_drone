@@ -34,9 +34,33 @@ using namespace std::placeholders;
 
 namespace nav_drone_costmap_3d {
 
+CostmapPublisher::CostmapPublisher(const std::string & name)
+  : CostmapPublisher(name, "/") {}
+
 
 CostmapPublisher::CostmapPublisher()
-  : Node("costmap_publisher")
+  : Node("costmap_publisher"),
+  name_("costmap")
+{
+    declare_parameter("map_topic", rclcpp::ParameterValue(std::string("map")));
+    init();
+}
+  
+CostmapPublisher::CostmapPublisher(
+    const std::string & name,
+    const std::string & parent_namespace)
+  : Node(name),
+  name_(name),
+  parent_namespace_(parent_namespace)
+{
+  declare_parameter(
+    "map_topic", rclcpp::ParameterValue(
+      (parent_namespace_ == "/" ? "/" : parent_namespace_ + "/") + std::string("map")));
+  init();
+
+}  
+  
+void CostmapPublisher::init()
 {
   costmap_ = std::make_shared<Costmap3D>(ALPHA_RES);
   last_costmap_update_ = this->get_clock()->now();
@@ -90,8 +114,9 @@ CostmapPublisher::CostmapPublisher()
   costmap_publisher_ = this->create_publisher<nav_drone_msgs::msg::Costmap>("nav_drone/costmap", 10);  
   timer_ = this->create_wall_timer(
     1000ms, std::bind(&CostmapPublisher::publish_costmap, this));   
+  
+  current_ = false;
 }
-
 // MAP SUBSCRIPTION ////////////////////////////////////////////////////////////////////////////////////////////////
 void CostmapPublisher::map_callback(const octomap_msgs::msg::Octomap::SharedPtr msg) 
 {
@@ -129,7 +154,7 @@ std::pair<int, int> CostmapPublisher::get_ez_grid_pos(const octomap::point3d & g
   nav_drone_util::transformPoseInTargetFrame(goal_pose, voxel, *tf_buffer_, robot_base_frame_);
     
   geometry_msgs::msg::PoseStamped source_pose;
-  goal_pose.header.frame_id = "map";
+  goal_pose.header.frame_id = robot_base_frame_;
   goal_pose.pose.position.x = 0.0;
   goal_pose.pose.position.y = 0.0;
   goal_pose.pose.position.z = 0.0;
@@ -142,6 +167,32 @@ std::pair<int, int> CostmapPublisher::get_ez_grid_pos(const octomap::point3d & g
     
   return std::pair<int, int>(e,z);
 } 
+  
+unsigned char CostmapPublisher::cost_at_pose(const geometry_msgs::msg::PoseStamped & pose)
+{
+  geometry_msgs::msg::PoseStamped voxel;
+  nav_drone_util::transformPoseInTargetFrame(pose, voxel, *tf_buffer_, robot_base_frame_);
+    
+  geometry_msgs::msg::PoseStamped source_pose;
+  source_pose.header.frame_id = robot_base_frame_;
+  source_pose.pose.position.x = 0.0;
+  source_pose.pose.position.y = 0.0;
+  source_pose.pose.position.z = 0.0;
+        
+  auto ez = nav_drone_util::calculate_ez(source_pose, voxel);
+    
+  // Moving the values into positive whole numbers, scaled to fit into our matrix
+  double e = floor( (90.0 + nav_drone_util::rad_to_deg( ez.first) ) / ALPHA_RES);
+  double z = floor( (180.0 + nav_drone_util::rad_to_deg( ez.second ) ) / ALPHA_RES);
+  
+  auto weight = costmap_->get_weight(e, z);
+  if( weight < 0.01) {
+    return FREE_SPACE;
+  } else {
+    return LETHAL_OBSTACLE;
+  }
+  
+}
 
 bool CostmapPublisher::update_costmap(const geometry_msgs::msg::PoseStamped & current_pose,
                       const double bounding_box_radius) {
@@ -261,9 +312,18 @@ void CostmapPublisher::publish_costmap() {
       }
     }
   }
+  
   costmap_mutex.unlock();
+
+  current_ = true;
     
   costmap_publisher_->publish(message);    
+}
+  
+bool CostmapPublisher::getRobotPose(geometry_msgs::msg::PoseStamped & global_pose) { 
+  return nav_drone_util::getCurrentPose(
+    global_pose, *tf_buffer_,
+    map_frame_, robot_base_frame_, transform_tolerance_);
 }
   
 }  // namespace nav_drone_costmap_3d
