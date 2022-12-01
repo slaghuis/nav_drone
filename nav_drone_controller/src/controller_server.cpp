@@ -324,8 +324,7 @@ private:
         }
 
         // Check if the robot is stuck here (for longer than a timeout)
-        
-        
+                
         try {
           geometry_msgs::msg::TwistStamped setpoint;
           setpoint = controllers_[current_controller_]->computeVelocityCommands( pose, last_velocity_.twist );      
