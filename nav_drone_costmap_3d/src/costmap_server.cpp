@@ -151,7 +151,12 @@ std::pair<int, int> CostmapPublisher::get_ez_grid_pos(const octomap::point3d & g
   goal_pose.pose.position.z = goal.z();
     
   geometry_msgs::msg::PoseStamped voxel;
-  nav_drone_util::transformPoseInTargetFrame(goal_pose, voxel, *tf_buffer_, robot_base_frame_);
+  //nav_drone_util::transformPoseInTargetFrame(goal_pose, voxel, *tf_buffer_, robot_base_frame_);
+  try {
+    nav_drone_util::transformPoseInTargetFrame(goal_pose, voxel, *tf_buffer_, robot_base_frame_);
+  } catch (const tf2::LookupException &ex) {
+     RCLCPP_INFO(this->get_logger(), "Oh dear : %s", ex.what());
+  }  
     
   geometry_msgs::msg::PoseStamped source_pose;
   goal_pose.header.frame_id = robot_base_frame_;
@@ -171,8 +176,12 @@ std::pair<int, int> CostmapPublisher::get_ez_grid_pos(const octomap::point3d & g
 unsigned char CostmapPublisher::cost_at_pose(const geometry_msgs::msg::PoseStamped & pose)
 {
   geometry_msgs::msg::PoseStamped voxel;
-  nav_drone_util::transformPoseInTargetFrame(pose, voxel, *tf_buffer_, robot_base_frame_);
-    
+  try {
+    nav_drone_util::transformPoseInTargetFrame(pose, voxel, *tf_buffer_, robot_base_frame_);
+  } catch (const tf2::LookupException &ex) {
+     RCLCPP_WARN(this->get_logger(), ex.what());
+    return NO_INFORMATION;
+  }  
   geometry_msgs::msg::PoseStamped source_pose;
   source_pose.header.frame_id = robot_base_frame_;
   source_pose.pose.position.x = 0.0;
