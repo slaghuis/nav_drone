@@ -103,7 +103,30 @@ void CostmapPublisher::init()
   // Create a transform listener
   tf_buffer_ =
     std::make_shared<tf2_ros::Buffer>(this->get_clock());      
-        
+ 
+  // Make sure that the transform between the robot base frame
+  // and the global frame is available
+
+  std::string tf_error;
+
+  RCLCPP_INFO(get_logger(), "Checking transform");
+  rclcpp::Rate r(2);
+  while (rclcpp::ok() &&
+    !tf_buffer_->canTransform(
+      map_frame_, robot_base_frame_, tf2::TimePointZero, &tf_error))
+  {
+    RCLCPP_INFO(
+      get_logger(), "Timed out waiting for transform from %s to %s"
+      " to become available, tf error: %s",
+      robot_base_frame_.c_str(), map_frame_.c_str(), tf_error.c_str());
+
+    // The error string will accumulate and errors will typically be the same, so the last
+    // will do for the warning above. Reset the string here to avoid accumulation
+    tf_error.clear();
+    r.sleep();
+  }
+
+  
   // ROS2 Subscriptions
   map_subscription_ = this->create_subscription<octomap_msgs::msg::Octomap>(
     "nav_drone/map", 10, std::bind(&CostmapPublisher::map_callback, this, _1));

@@ -85,7 +85,7 @@ public:
     nav_drone_util::declare_parameter_if_not_declared(
       this, "robot_base_frame", rclcpp::ParameterValue("base_link"));   
     nav_drone_util::declare_parameter_if_not_declared(
-      this, "transform_tolerance", rclcpp::ParameterValue(0.1));
+      this, "transform_tolerance", rclcpp::ParameterValue(0.3));
     declare_parameter("planner_plugins", default_ids_);
     declare_parameter("planner_types", default_types_);
     declare_parameter("expected_planner_frequency", 1.0);
@@ -175,6 +175,28 @@ private:
     // ROS2 Subscriptions
     map_subscription_ = this->create_subscription<octomap_msgs::msg::Octomap>(
       "nav_drone/map", 10, std::bind(&PlannerServer::map_callback, this, _1));
+      
+    // First, make sure that the transform between the robot base frame
+    // and the global frame is available
+
+    std::string tf_error;
+
+    RCLCPP_INFO(get_logger(), "Checking transform");
+    rclcpp::Rate r(2);
+    while (rclcpp::ok() &&
+      !tf_buffer_->canTransform(
+        map_frame_, robot_base_frame_, tf2::TimePointZero, &tf_error))
+    {
+      RCLCPP_INFO(
+        get_logger(), "Timed out waiting for transform from %s to %s"
+        " to become available, tf error: %s",
+        robot_base_frame_.c_str(), map_frame_.c_str(), tf_error.c_str());
+
+      // The error string will accumulate and errors will typically be the same, so the last
+      // will do for the warning above. Reset the string here to avoid accumulation
+      tf_error.clear();
+      r.sleep();
+    }
 
     this->action_server_ = rclcpp_action::create_server<ComputePathToPose>(
       this,
@@ -182,6 +204,7 @@ private:
       std::bind(&PlannerServer::handle_goal, this, _1, _2),
       std::bind(&PlannerServer::handle_cancel, this, _1),
       std::bind(&PlannerServer::handle_accepted, this, _1));  
+    
   }
   
   // MAP SUBSCRIPTION ////////////////////////////////////////////////////////////////////////////////////////////////
