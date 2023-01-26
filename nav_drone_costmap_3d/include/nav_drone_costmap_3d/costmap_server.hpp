@@ -136,6 +136,7 @@ protected:
       
 private:
   std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
+  std::shared_ptr<tf2_ros::TransformListener> transform_listener_{nullptr};  
   std::shared_ptr<octomap::OcTree> octomap_;
   std::shared_ptr<Costmap3D> costmap_;
       

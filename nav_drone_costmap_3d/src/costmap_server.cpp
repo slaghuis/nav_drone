@@ -71,7 +71,7 @@ void CostmapPublisher::init()
   nav_drone_util::declare_parameter_if_not_declared(
     this, "robot_base_frame", rclcpp::ParameterValue("base_link"));   
   nav_drone_util::declare_parameter_if_not_declared(
-    this, "transform_tolerance", rclcpp::ParameterValue(0.1));
+    this, "transform_tolerance", rclcpp::ParameterValue(0.3));
   nav_drone_util::declare_parameter_if_not_declared(
     this, "lookahead_dist", rclcpp::ParameterValue(2.0));
   nav_drone_util::declare_parameter_if_not_declared(
@@ -103,6 +103,8 @@ void CostmapPublisher::init()
   // Create a transform listener
   tf_buffer_ =
     std::make_shared<tf2_ros::Buffer>(this->get_clock());      
+  transform_listener_ =
+    std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
  
   // Make sure that the transform between the robot base frame
   // and the global frame is available
