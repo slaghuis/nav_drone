@@ -2,7 +2,12 @@
 An action server for ``nav_drone_msg::action::ComputePathToPose``. Typically called by the `nav_drone_bt_navigator` `ComputePathToPose` action from this repository. Implements a plugin interface for the ``nav_drone_core::planner`` class
 
 ## Depencencies
-  - Only the packages listed in CMakeLists.txt
+### Octomap Server
+This nodes listens to messages from the Octomap Server to obtain a view of all obstacles in the environment.
+```
+sudo apt-get install ros-foxy-octomap-server
+``` 
+Be sure to configure the Octomap server and run the required nodes to publish the octomap.
 
 ## Testing
 Whilst running the:
@@ -17,5 +22,5 @@ ros2 action send_goal /nav_drone/compute_path_to_pose "nav_drone_msgs/action/Com
 
 ```
 
-# Code Status
-This is still a **work in progress**.  This code has not flown in a simulator yet. (02/10/2022)
+## Code Status
+This is still a **work in progress**.  This code has flown in a simulator. (31/01/2023)
