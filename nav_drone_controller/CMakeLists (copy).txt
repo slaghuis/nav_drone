@@ -29,7 +29,17 @@ find_package(std_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 
+include_directories(
+  include
+)
 
+set(executable_name controller_server) 
+
+set(library_name controller_action_server) 
+
+add_library(${library_name} SHARED
+  src/controller_server.cpp)
+  
 set(dependencies
   rclcpp
   rclcpp_action
@@ -43,19 +53,6 @@ set(dependencies
   nav_msgs
   pluginlib)
   
-include_directories(
-  include
-)  
-
-add_library(controller_action_server SHARED
-  src/controller_server.cpp)
-target_include_directories(controller_action_server PRIVATE
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
-target_compile_definitions(controller_action_server
-  PRIVATE "NAV_DRONE_BUILDING_DLL")
-ament_target_dependencies(controller_action_server ${dependencies} )
-
 add_library(simple_progress_checker SHARED plugins/simple_progress_checker.cpp)
 ament_target_dependencies(simple_progress_checker ${dependencies})
 
@@ -66,17 +63,20 @@ add_library(stopped_goal_checker SHARED plugins/stopped_goal_checker.cpp)
 target_link_libraries(stopped_goal_checker simple_goal_checker)
 ament_target_dependencies(stopped_goal_checker ${dependencies})
 
-rclcpp_components_register_node(controller_action_server PLUGIN "nav_drone_controller::ControllerServer" EXECUTABLE controller_server)
+ament_target_dependencies(${library_name}
+  ${dependencies})
 
-install(TARGETS
-  simple_progress_checker simple_goal_checker stopped_goal_checker controller_action_server
+rclcpp_components_register_nodes(${library_name} PLUGIN "nav_drone::ControllerServer")
+
+install(TARGETS simple_progress_checker simple_goal_checker stopped_goal_checker ${library_name}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
-  
+
+
 install(DIRECTORY include/
   DESTINATION include/
-)  
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -89,11 +89,11 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-
 ament_export_include_directories(include)
 ament_export_libraries(simple_progress_checker
   simple_goal_checker
-  stopped_goal_checker)
+  stopped_goal_checker
+  ${library_name})
 ament_export_dependencies(${dependencies})
 pluginlib_export_plugin_description_file(nav_drone_core plugins.xml)
 

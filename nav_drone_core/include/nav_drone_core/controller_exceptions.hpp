@@ -69,6 +69,13 @@ public:
   : ControllerException(description) {}
 };  
 
+class InvalidController : public ControllerException
+{
+public:
+  explicit InvalidController(const std::string & description)
+  : ControllerException(description) {}
+};    
+  
 }  // namespace nav_drone_core
 
 #endif  // NAV_DRONE_CORE__CONTROLLER_EXCEPTIONS_HPP_
