@@ -43,7 +43,7 @@ ControllerServer::ControllerServer(const rclcpp::NodeOptions & options)
   default_progress_checker_id_("progress_checker"),
   default_progress_checker_type_("nav_drone_controller::SimpleProgressChecker"),
   goal_checker_loader_("nav_drone_core", "nav_drone_core::GoalChecker"),
-  default_goal_checker_ids_{"goal_checker"},
+  default_goal_checker_ids_{"SimpleGoalChecker"},
   default_goal_checker_types_{"nav_drone_controller::SimpleGoalChecker"},
   lp_loader_("nav_drone_core", "nav_drone_core::Controller"),
   default_ids_{"RegulatedPurePursuitController"},
