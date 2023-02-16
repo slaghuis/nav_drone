@@ -179,7 +179,7 @@ rclcpp_action::GoalResponse PlannerServer::handle_goal(
   (void)uuid;
   // Consider rejecting goals that does not present in the "map" frame
   // Alternatively, include a transform to the map frame.
-  return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE
+  return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
 
 rclcpp_action::CancelResponse PlannerServer::handle_cancel(
