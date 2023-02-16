@@ -4,9 +4,10 @@
 #include <vector>
 #include "nav_drone_controller/plugins/simple_goal_checker.hpp"
 #include "pluginlib/class_list_macros.hpp"
-#include "angles/angles.h"
+//#include <angles/angles.h>
 #include "nav_drone_util/node_utils.hpp"
 #include "nav_drone_util/geometry_utils.hpp"
+#include "nav_drone_util/angle_utils.hpp"
 #include "tf2/utils.h"
 
 using std::placeholders::_1;
@@ -69,7 +70,12 @@ bool SimpleGoalChecker::isGoalReached(
       check_xy_ = false;
     }
   }
-  double dyaw = angles::shortest_angular_distance(
+//  double dyaw = nav_drone_util::getDiff2Angles(
+//    tf2::getYaw(query_pose.orientation),
+//    tf2::getYaw(goal_pose.orientation),
+//    PI);
+    
+  double dyaw = nav_drone_util::shortest_angular_distance(
     tf2::getYaw(query_pose.orientation),
     tf2::getYaw(goal_pose.orientation));
   return fabs(dyaw) < yaw_goal_tolerance_;

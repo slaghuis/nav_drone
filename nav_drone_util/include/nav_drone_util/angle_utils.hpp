@@ -11,9 +11,15 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+// In ROS Foxy there is a angles/angles.h with most of these functions,
+// but for some reason the file was not present on my Raspberry PI install.
+
 #pragma once
 
+#include <algorithm>
 #include <cmath>  // floor
+
 #include <tf2_ros/buffer.h>
 #include "geometry_msgs/msg/pose.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
@@ -24,22 +30,70 @@ const double PI  =3.141592653589793238463;
 
 namespace nav_drone_util 
 {
+  
+    /*!
+   * \brief Convert degrees to radians
+   */
 
-/*
-// In C the modulo operation returns a value with the same sign as the dividend.
-// Hence a custom modulo function
-inline double modulo(const double a, const double n) {
-  return a - floor(a/n) * n;
-}
+  static inline double from_degrees(double degrees)
+  {
+    return degrees * M_PI / 180.0;
+  }
 
-// Returns the difference between two angles x and y as a number 
-// between -180 and 180.  c can be PI for radians, or 180 for degrees. 
-inline double getDiff2Angles(const double x, const double y, const double c)
-{
-  double a = x-y;
-  return modulo( a+c, 2*c) - c;
-}
-*/  
+  /*!
+   * \brief Convert radians to degrees
+   */
+  static inline double to_degrees(double radians)
+  {
+    return radians * 180.0 / M_PI;
+  }
+
+
+  /*!
+   * \brief normalize_angle_positive
+   *
+   *        Normalizes the angle to be 0 to 2*M_PI
+   *        It takes and returns radians.
+   */
+  static inline double normalize_angle_positive(double angle)
+  {
+    const double result = fmod(angle, 2.0*M_PI);
+    if(result < 0) return result + 2.0*M_PI;
+    return result;
+  }
+
+  /*!
+   * \brief normalize
+   *
+   * Normalizes the angle to be -M_PI circle to +M_PI circle
+   * It takes and returns radians.
+   *
+   */
+  static inline double normalize_angle(double angle)
+  {
+    const double result = fmod(angle + M_PI, 2.0*M_PI);
+    if(result <= 0.0) return result + M_PI;
+    return result - M_PI;
+  }
+
+
+  /*!
+   * \function
+   * \brief shortest_angular_distance
+   *
+   * Given 2 angles, this returns the shortest angular
+   * difference.  The inputs and ouputs are of course radians.
+   *
+   * The result
+   * would always be -pi <= result <= pi.  Adding the result
+   * to "from" will always get you an equivelent angle to "to".
+   */
+
+  static inline double shortest_angular_distance(double from, double to)
+  {
+    return normalize_angle(to-from);
+  }
+ 
 
 inline double getDiff2Angles(const double x, const double y, const double c)
 {
